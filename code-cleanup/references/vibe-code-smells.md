@@ -65,21 +65,26 @@ When uncertain, report the finding; do not change the code.
 - Factories, adapters, repositories, or strategy layers with no alternate impl
 - Generic `Base*` / `Abstract*` types that only forward calls
 - Premature plugin or provider systems for one consumer
+- Abstractions introduced only to satisfy a design principle
 
 **What to investigate**
 - Whether a second implementation exists or is planned in-repo (docs, TODOs with owners)
 - Indirection cost vs call-site clarity
 - Whether the abstraction matches an established local pattern
+- Capability justification: required capability vs additional flexibility
+- Public contracts, DI seams, tests, plugins, or framework conventions that need the boundary
 
 **When it is safe to clean**
 - Removing the layer reveals a simpler direct call with identical behavior
 - No external/public contract depends on the abstraction
 - Tests target behavior, not the artificial seam
+- Capability lost is not currently required and human APPROVE was obtained
 
 **When NOT to automatically change it**
 - The abstraction is a required boundary (SDK, DI, testing seam used deliberately)
 - Multiple implementations exist outside the scanned tree (packages, plugins)
 - Removal forces a large redesign
+- Requirement ownership or future commitment is unclear (report-only)
 
 ---
 
@@ -257,10 +262,12 @@ When uncertain, report the finding; do not change the code.
 - Config knobs and generics for a single hard-coded case
 - Over-parameterized helpers "for future use"
 - Template/plugin systems with one instantiation
+- Generic systems built for one concrete use case
 
 **What to investigate**
 - Real call sites and configuration values in use
 - Whether generalization matches an established extension point
+- Whether lost flexibility is a demonstrated requirement
 
 **When it is safe to clean**
 - Specializing to the actual case preserves behavior and simplifies call sites
@@ -365,3 +372,166 @@ When uncertain, report the finding; do not change the code.
 - Mass rename across the repository for stylistic consistency
 - Renaming public contracts, DB columns, or external payloads without explicit approval
 - Ambiguous domain language with no clear canonical term
+
+---
+
+## 16. Used-but-unnecessary code
+
+**Symptoms**
+- Code is imported, called, compiles, and may have tests
+- Machinery exists mainly for flexibility, purity, or "niceness"
+- Removing or specializing it would not remove a demonstrated product behavior
+
+**What to investigate**
+- Current required capability vs additional capability introduced
+- Contracts, config, tests, history, and platform layers that justify the extra machinery
+- Whether a simpler existing-pattern implementation preserves required behavior
+
+**When it is safe to clean**
+- Capability justification shows additional capability is unused and uncommitted
+- Simplification is small, verifiable, and human-approved
+- Conceptual complexity decreases
+
+**When NOT to automatically change it**
+- Absence of immediate evidence only (not proof it is unnecessary)
+- Boundary, contract, security, or operational need is plausible but unclear
+- Cleanup would replace one architecture with a preferred different one
+
+---
+
+## 17. Speculative / nice-to-have functionality
+
+**Symptoms**
+- Working capability with no demonstrated current or committed requirement
+- Fallback provider nobody currently requires
+- Optional features enabled "just in case"
+- AI-added helpers that product flows never need
+
+**What to investigate**
+- Product docs, configs, deploy modes, and tests for real use
+- Whether capability is part of an external/public contract
+- Distinction from dead code (this code *is* wired)
+
+**When it is safe to clean**
+- No current/committed requirement; required paths remain after removal
+- Human APPROVE after capability-justification presentation
+
+**When NOT to automatically change it**
+- Near-term committed roadmap or external consumer is plausible
+- Removing it changes observable product behavior without approval
+
+---
+
+## 18. Premature extensibility
+
+**Symptoms**
+- Extensibility hooks with no demonstrated extension
+- Provider switching with one fixed provider
+- Plugin/registry systems for a single registrant
+
+**What to investigate**
+- Actual alternate implementations, config selectors, and tests
+- Whether the seam is a repository-established boundary
+
+**When it is safe to clean**
+- Specialize or call the concrete implementation directly with equal behavior
+
+**When NOT to automatically change it**
+- Plugin loading, DI, or public SDK contracts require the seam
+
+---
+
+## 19. Premature scalability
+
+**Symptoms**
+- Caching, queues, sharding, pooling, or fan-out with no demonstrated load need
+- Scalability infrastructure for hypothetical traffic
+
+**What to investigate**
+- Measured or documented performance/load requirements
+- Whether platform/framework already provides the capability
+- Failure modes if the layer is removed
+
+**When it is safe to clean**
+- No demonstrated performance problem; simpler path preserves correctness
+
+**When NOT to automatically change it**
+- Deployment/SLAs or known production load depend on it
+- Removal risk is unverified (report-only)
+
+---
+
+## 20. Hypothetical configuration
+
+**Symptoms**
+- Configuration options with no demonstrated current use
+- Modes/flags for unsupported environments
+- Env vars read once and always defaulted the same way
+
+**What to investigate**
+- Deploy manifests, docs, and runtime values across environments
+- Whether options are part of a public/operator contract
+
+**When it is safe to clean**
+- Options never selected; simplifying config preserves current behavior
+
+**When NOT to automatically change it**
+- External operators or undocumented deploy docs may depend on them
+
+---
+
+## 21. Redundant resilience
+
+**Symptoms**
+- Multiple retry layers "for safety"
+- Duplicate timeouts/circuit breakers wrapping the same call
+- Fallbacks that hide errors without a required recovery story
+
+**What to investigate**
+- Actual failure requirements and existing platform resilience
+- Whether redundancy changes correctness or observability
+
+**When it is safe to clean**
+- One intentional resilience path remains; behavior and failure visibility preserved
+
+**When NOT to automatically change it**
+- Failure/ops requirements are unclear
+- Security or data-integrity paths rely on the defenses
+
+---
+
+## 22. Unnecessary compatibility layers
+
+**Symptoms**
+- Compatibility code for unsupported versions
+- Shims bridging APIs the repo no longer targets
+- Dual serializers/clients "for migration" with migration complete
+
+**What to investigate**
+- Supported version matrix and live callers
+- Whether external clients still need the layer
+
+**When it is safe to clean**
+- Compatibility requirement is demonstrably gone; cutover complete
+
+**When NOT to automatically change it**
+- External clients or version support commitments remain
+
+---
+
+## 23. Unnecessary states / branches
+
+**Symptoms**
+- Additional states or branches that support no demonstrated behavior
+- Enums/status machines with unused values still threaded everywhere
+- Defensive branches for impossible or already-protected states
+
+**What to investigate**
+- Reachability from real inputs and configs
+- Whether branches encode undocumented business rules
+
+**When it is safe to clean**
+- Branches are unreachable under demonstrated requirements; tests confirm
+
+**When NOT to automatically change it**
+- Domain rules are unclear; dynamic inputs may hit the branch

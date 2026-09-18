@@ -3,9 +3,10 @@ name: code-cleanup
 description: >-
   Safely analyze and clean existing codebases for maintainability, readability,
   consistency, security, and structural quality while preserving intended
-  behavior. Prefer deletion and consolidation over new abstractions. Use when
-  asked to clean up, refactor safely, reduce tech debt, audit AI/vibe-coded
-  repos, or run code-cleanup in Analyze or Apply mode.
+  behavior. Detect used-but-unnecessary and speculative AI-generated complexity.
+  Prefer deletion and consolidation over new abstractions. Use when asked to
+  clean up, refactor safely, reduce tech debt, audit AI/vibe-coded repos, or
+  run code-cleanup in Analyze or Apply mode.
 disable-model-invocation: true
 ---
 
@@ -42,6 +43,16 @@ Prefer:
 - small verified changes over broad rewrites
 - evidence over assumptions
 - reporting uncertainty instead of guessing
+
+**Used does not mean necessary. Working does not mean justified.**
+Evaluate whether complexity supports a demonstrated current requirement,
+contract, invariant, integration, operational need, or established repository
+boundary. Prefer the simplest implementation that preserves those
+demonstrated responsibilities.
+
+Do not interpret this as permission to aggressively delete working code.
+Absence of immediately visible evidence is NOT proof that something is
+unnecessary.
 
 Understand the repository before modifying it.
 
@@ -108,6 +119,9 @@ Inspect for:
 - unnecessary files
 - unnecessary abstractions
 - excessive complexity
+- **unjustified complexity** (used and working, but more machinery than
+  demonstrated responsibility requires)
+- speculative functionality
 - inconsistent patterns
 - architecture/responsibility issues
 - dependency problems
@@ -121,10 +135,43 @@ Inspect for:
 Use [cleanup-checklist.md](references/cleanup-checklist.md). For AI-heavy
 repos, also use [vibe-code-smells.md](references/vibe-code-smells.md).
 
+When meaningful complexity is encountered, do not stop after determining that
+the code is referenced. Perform **Necessity analysis** (below).
+
 ### 4. CLASSIFY
 
 **Finding types:** Correctness, Security, Architecture, Maintainability,
-Duplication, Dead Code, Dependency, Performance, Testing, Documentation.
+Duplication, Dead Code, Dependency, Performance, Testing, Documentation,
+**Unjustified Complexity**.
+
+**Unjustified Complexity** means code that is used and functional but introduces
+more machinery, flexibility, states, indirection, infrastructure, or capability
+than the demonstrated responsibility requires (for example speculative
+abstractions, single-use generics, wrappers that only forward, hypothetical
+provider/plugin systems, unused configuration, premature caching/scalability,
+redundant resilience, compatibility layers without a demonstrated need, or
+"nice-to-have" AI-generated capability).
+
+Distinguish:
+
+- **Dead code** — not used
+- **Unjustified complexity** — used, but more machinery than demonstrated
+  responsibility requires
+- **Speculative functionality** — working capability with no demonstrated
+  current or committed requirement
+
+Suspected unjustified complexity must **not** automatically become Actionable.
+Use the existing buckets:
+
+- **Actionable** — clearly unnecessary; required behavior understood;
+  simplification small; capability loss understood; verification possible
+- **Report-only** — strong evidence of unnecessary complexity, but ownership,
+  external consumers, runtime usage, future commitment, or behavioral impact
+  is uncertain
+- **Non-actionable** — justified by a demonstrated responsibility or
+  established boundary, or the concern is merely architectural/style preference
+
+When uncertain, prefer Report-Only.
 
 Every finding must include a **confidence** level independently from priority.
 
@@ -189,6 +236,8 @@ Use for:
 Use for:
 
 - maintainability problems with concrete engineering cost
+- unjustified complexity with evidenced unnecessary machinery and understood
+  capability loss
 - test/reliability weaknesses
 - architectural or consistency problems with evidence they increase defect or
   maintenance risk
@@ -202,6 +251,127 @@ Use for:
 - stale documentation
 - minor cleanup
 - small inconsistencies with limited operational impact
+
+## Necessity analysis
+
+When meaningful complexity is encountered, ask:
+
+1. What current responsibility does this code serve?
+2. What current requirement, contract, invariant, integration, operational
+   need, or established repository convention requires that responsibility?
+3. Is the amount of complexity proportional to that responsibility?
+4. Could the same required behavior be implemented materially more simply
+   using existing repository patterns?
+5. What concrete capability would be lost if this code were removed,
+   consolidated, specialized, or simplified?
+6. Is that lost capability currently required?
+7. Is it part of an explicitly committed near-term requirement?
+8. Is the complexity protecting an external/public contract?
+9. Is it an intentional architecture boundary?
+10. Is it required for testing, security, infrastructure isolation,
+    dependency inversion, plugin loading, or runtime configuration?
+11. Does repository history/documentation provide evidence for why it exists?
+12. Is another framework/library/platform layer already providing the same
+    capability?
+
+### Capability justification
+
+For suspected unjustified complexity, explicitly identify:
+
+```text
+Current required capability:
+Additional capability introduced by the complexity:
+Evidence that the additional capability is required:
+Simpler alternative:
+Capability lost by simplification:
+Evidence that the lost capability is acceptable:
+Uncertainty:
+```
+
+Do not allow findings such as "This factory looks unnecessary." Require the
+capability justification fields above.
+
+### Weak justifications
+
+These statements alone are NOT sufficient justification for keeping complexity:
+
+- "might be useful later" / "future-proof" / "just in case" / "nice to have"
+- "more flexible" / "more scalable" / "more robust"
+- "clean architecture" / "follows SOLID" / "follows DRY" / "best practice"
+- "supports future providers" / "allows future extension"
+
+Require repository-specific evidence. These phrases are also NOT proof that
+the code should be removed. Investigate first.
+
+### Justification hierarchy
+
+Prefer evidence in roughly this order:
+
+1. Current executable behavior / runtime usage
+2. Public or external contracts
+3. Current product/business requirements
+4. Security or correctness invariants
+5. Deployment/infrastructure requirements
+6. Tests demonstrating required behavior
+7. Runtime configuration
+8. Established repository architecture/boundaries
+9. Repository documentation
+10. Explicitly committed near-term requirements
+
+Weak evidence: TODO without context, speculative comments, generic best
+practices, architectural preference, hypothetical future use.
+
+### Preserve intentional boundaries
+
+Do NOT automatically remove an abstraction merely because it has one
+implementation, few callers, a simple implementation, or because direct calls
+would use fewer lines.
+
+A single implementation may still be a justified boundary for external/public
+contracts, established DI, testing seams, security boundaries, infrastructure
+isolation, plugins, dynamic loading, framework conventions, separate
+ownership, or committed near-term requirements.
+
+Require evidence before simplification.
+
+### Prefer simplification, not replacement architecture
+
+When an Unjustified Complexity finding is approved, prefer in order:
+
+remove → consolidate → specialize → simplify → reuse existing repository pattern
+
+Avoid replacing an old abstraction with a new "better" abstraction.
+Cleanup must produce less conceptual machinery, not merely different machinery.
+
+### Complexity delta check
+
+For every approved Unjustified Complexity cleanup, compare before/after:
+
+- files involved
+- abstractions involved
+- dependencies involved
+- configuration/options involved
+- meaningful branches/states involved
+
+Do not require every numeric measure to decrease. Ask: did conceptual
+complexity decrease while required capability remained? If the cleanup
+introduces equal or greater conceptual complexity, **STOP** and reassess.
+
+### Do not over-correct
+
+Objective: minimum **justified** complexity for demonstrated responsibilities—
+not minimum lines of code.
+
+Do not:
+
+- delete code merely because its requirement is not immediately obvious
+- remove extension points merely because only one implementation exists
+- simplify public contracts without explicit approval
+- remove operational resilience without understanding failure requirements
+- remove security checks because they appear redundant
+- remove scalability mechanisms without understanding actual deployment
+- replace working architecture with a preferred architecture
+- treat line count as the measure of simplicity
 
 ### 5. DECIDE
 
@@ -221,13 +391,19 @@ Place each item into exactly one bucket:
   (unclear intent/ownership, possible external consumers or public contracts,
   uncertain runtime impact, product/architecture decision required, or
   insufficient verification). Low-confidence findings normally land here.
+  Suspected unjustified complexity with uncertain requirement ownership also
+  lands here.
 - **Non-actionable observation** — stylistic preference, intentional pattern,
   documented placeholder, alternative valid design, speculative improvement,
-  or smell without demonstrated engineering impact
+  smell without demonstrated engineering impact, or complexity justified by a
+  demonstrated responsibility/boundary
 
 If uncertain, **REPORT** the finding (report-only) instead of modifying the code.
 Non-actionable observations must not become cleanup tasks unless new evidence
 changes their classification.
+
+For Unjustified Complexity, also confirm capability loss is understood and
+verification can show required behavior remains.
 
 ### 6. PLAN
 
@@ -435,10 +611,25 @@ Present:
 - Risk
 - Verification plan
 
+For **Unjustified Complexity** findings, also present:
+
+```text
+Current required capability:
+Additional capability being provided:
+Evidence it is required:
+Proposed simplification:
+Capability that would be removed:
+Evidence removal is safe:
+Uncertainty:
+```
+
 Then stop and request a human decision.
 
 Supported decisions: **APPROVE**, **MODIFY APPROACH**, **INVESTIGATE**,
 **SKIP**, **DEFER**, **STOP**.
+
+Do not automatically simplify or delete working-but-unnecessary code.
+**APPROVE** is still required before modification.
 
 ### APPROVE
 
@@ -452,6 +643,10 @@ Do not fix another finding while touching the same file.
 
 If another cleanup opportunity is discovered, record it as a new finding
 and leave it unchanged.
+
+For Unjustified Complexity: follow remove → consolidate → specialize →
+simplify → reuse existing pattern. After applying, run the **complexity
+delta check**. If conceptual complexity did not decrease, STOP and reassess.
 
 ### MODIFY APPROACH
 
@@ -510,6 +705,7 @@ Verification result:
 Behavior changes:
 Unexpected changes:
 Remaining risk:
+Complexity delta (Unjustified Complexity only):
 ```
 
 Then stop again.

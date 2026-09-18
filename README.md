@@ -13,13 +13,16 @@ CLI, API, or cleanup engine.
 
 1. **Understand** a target repository (structure, conventions, commands, tests)
 2. **Baseline** build/test/lint health without weakening checks
-3. **Audit** for concrete maintainability, correctness, security, and structural issues
+3. **Audit** for concrete maintainability, correctness, security, structural
+   issues, and AI-generated accidental or speculative complexity
 4. **Classify and decide** what is safe to change vs report-only
 5. Optionally **apply** small, verified cleanups that preserve intended behavior
+   under mandatory human-in-the-loop review (one finding at a time)
 6. **Report** what changed, what remains, and what is uncertain
 
 The skill strongly prefers simplification, consolidation, and deletion over
-creating new files, abstractions, or dependencies.
+creating new files, abstractions, or dependencies. **Used does not mean
+necessary**—referenced, compiling code may still be unjustified complexity.
 
 A clean or mature repository may correctly receive **zero** code changes.
 
@@ -46,9 +49,9 @@ clean-code-skills/
 | Mode | Behavior |
 |------|----------|
 | **ANALYZE** | Discover → Baseline → Audit → Classify → Decide → Plan → Report. **Does not modify source files.** |
-| **APPLY** | Same preparation, then Clean → Verify → Report. Only executes safe, sufficiently understood findings. |
+| **APPLY** | Human-guided: present one finding, wait for approval, apply only that finding, verify, show the diff, wait for ACCEPT/REVISE/REVERT, then continue. **No automatic modification.** |
 
-If mode is unspecified, prefer **ANALYZE** first, then Apply only for approved items.
+If mode is unspecified, prefer **ANALYZE** first, then Apply under human-in-the-loop review.
 
 Details live in [`code-cleanup/SKILL.md`](code-cleanup/SKILL.md).
 
@@ -61,8 +64,7 @@ repository** that is not this skills repo.
 Example prompts:
 
 - `Run code-cleanup in Analyze mode on this repository.`
-- `Run code-cleanup in Apply mode for the High-priority duplication findings only.`
-
+- `Run code-cleanup in Apply mode. Start with finding F1 only.`
 ## How to test the skill
 
 Evaluate the skill against multiple real repositories—not against this
@@ -100,6 +102,7 @@ definition repo alone.
 ## Design stance
 
 - Evidence over assumptions; uncertainty is reported, not guessed away.
+- Used does not mean necessary; working does not mean justified.
 - Existing repository patterns beat imported "best practices."
 - Principles such as SOLID or DRY are optional reasoning aids, not mandatory checklists.
 - Cleanup must not become a vehicle for new features, contract changes, or broad rewrites.

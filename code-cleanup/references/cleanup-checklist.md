@@ -61,6 +61,27 @@ reach a line-count target.
 
 ---
 
+## Necessity / complexity
+
+Use when code is referenced and working, but may still be unjustified.
+
+- [ ] Is this complexity required by current behavior?
+- [ ] What capability disappears if removed, consolidated, or specialized?
+- [ ] Is that capability actually required (current or committed near-term)?
+- [ ] Is the repository already solving this problem elsewhere?
+- [ ] Is this abstraction protecting a real boundary (contract, DI, test seam,
+      security, plugin, framework convention)?
+- [ ] Is this functionality speculative / "nice to have" / future-proofing?
+- [ ] Is future-proofing supported by an actual commitment?
+- [ ] Could existing repository patterns express the same required behavior more
+      simply?
+- [ ] Would simplification reduce conceptual machinery (not merely replace it)?
+
+**Used ≠ necessary.** Absence of immediate evidence is not proof of
+unnecessary code—prefer Report-Only when uncertain.
+
+---
+
 ## Architecture / responsibility
 
 - [ ] Module boundaries match how the repository actually organizes work
