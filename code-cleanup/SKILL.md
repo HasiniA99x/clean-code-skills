@@ -570,6 +570,8 @@ When all findings have been reviewed or the human stops the session, report:
 
 Also maintain and include session progress totals (see Human-in-the-loop).
 Do not treat skipped, deferred, or remaining report-only items as resolved.
+Keep the final report concise and in simple English. Structured technical
+detail is fine; do not repeat the same evidence in multiple sections.
 
 ---
 
@@ -579,6 +581,10 @@ Mandatory for all source modifications. Sequence:
 
 ANALYZE → classify findings → human review → fix **ONE** finding → verify →
 human review → continue to next finding
+
+Cleanup logic, safety rules, priority, confidence, necessity analysis, and
+approval requirements are unchanged. This section also defines how to talk to
+the human in APPLY chat.
 
 ### Human-in-the-loop rule
 
@@ -592,41 +598,231 @@ Approval for one finding does not authorize changes for another finding.
 Do not batch multiple findings under one approval unless the human
 explicitly asks to batch those specific finding IDs.
 
-### Before applying a finding
+### Conversational UX (APPLY chat)
 
-Present:
+Deep analysis internally. Small decisions externally.
 
-- Finding ID and title
-- Type
-- Priority
-- Confidence
-- Evidence
-- Why it should be changed
-- Exact proposed remediation
-- Expected files to change
-- Expected files to create
-- Expected files to delete
-- Expected dependency changes
-- Expected behavior changes
-- Risk
-- Verification plan
+The human should never need to read a full audit report just to answer the
+next cleanup question.
 
-For **Unjustified Complexity** findings, also present:
+#### Simple English
+
+All human-facing APPLY chat must use simple English:
+
+- short sentences
+- common words
+- concrete explanations
+- small paragraphs
+- at most 3 short bullets when useful
+
+Avoid formal audit language when a simpler phrase exists.
+Avoid tables in interactive chat.
+
+Chat labels (prefer in interactive chat):
+
+- Unjustified Complexity → Extra complexity
+- Actionable → Safe to fix
+- Report-Only → Needs more information
+- Non-Actionable → Leave it alone
+- Current required capability → What the app needs today
+- Additional capability introduced → What this extra code adds
+- Proposed remediation → Suggested change
+
+Show formal classification only when useful or the user asks.
+
+#### Chunked chat
+
+Never present the entire investigation or finding report at once.
+
+Reveal information in small chunks:
+
+FIND → explain ONE important point → ask ONE question → STOP →
+human answers → explain the next relevant point → ask ONE question → STOP
+
+Continue until enough information exists for the current decision.
+
+#### Response size
+
+For normal interactive messages:
+
+- prefer 2-4 short sentences
+- use at most 3 short bullets when useful
+- then show the decision
+- avoid tables
+- avoid long technical summaries
+- avoid repeating session progress after every interaction
+
+Aim for roughly **5-8 short lines** before decision options.
+
+Detailed information stays available on request:
+
+- Show details
+- Show evidence
+- Show code
+- Show affected files
+- Show technical reasoning
+
+#### Do not show internal report fields by default
+
+Do not automatically show:
+
+- Type, Priority, Confidence
+- Capability justification
+- Classification tables
+- Full evidence or full uncertainty analysis
+- Session progress
+- Cleanup plan
+- Detailed verification plan
+
+Keep these internally. Show them only when necessary for the immediate
+decision, or when the human asks.
+
+#### One question / one decision at a time
+
+When human information is needed:
+
+1. Ask **exactly one** question **or** present **exactly one** decision.
+2. STOP.
+3. Wait for the answer before continuing.
+
+Do not ask multiple requirement questions in one message.
+
+Do not mix decisions from different stages in one prompt
+(for example do not combine investigate / approve / skip / defer / evidence /
+next finding when those belong to different stages).
+
+Ask only what is relevant **now**.
+
+#### Do not ask what the repository can answer
+
+Before asking the human, investigate the repository (code, tests, config, docs,
+history, patterns).
+
+Ask the human only when the answer cannot be established with enough
+confidence from the repository.
+
+#### Progressive disclosure
+
+Use this interaction pattern:
+
+FIND → EXPLAIN ONE POINT → ASK ONE QUESTION IF NEEDED → WAIT →
+(next point / INVESTIGATE conversationally) → SUGGEST SIMPLE CHANGE →
+ASK FOR APPROVAL → WAIT → APPLY → VERIFY → SHOW SIMPLE RESULT →
+WAIT FOR ACCEPTANCE
+
+#### Investigation can end early
+
+Do not continue investigating once enough information exists for the current
+decision.
+
+Example:
 
 ```text
-Current required capability:
-Additional capability being provided:
-Evidence it is required:
-Proposed simplification:
-Capability that would be removed:
-Evidence removal is safe:
-Uncertainty:
+I cannot prove whether another provider is required.
+
+Without that information, I don't recommend changing this code.
+
+Leave it for now?
+
+1. Yes
+2. Investigate further
+3. Show details
 ```
 
-Then stop and request a human decision.
+Then STOP.
 
-Supported decisions: **APPROVE**, **MODIFY APPROACH**, **INVESTIGATE**,
-**SKIP**, **DEFER**, **STOP**.
+#### Handle "Not sure"
+
+"Not sure" is a valid answer.
+
+If the user is not sure:
+
+- investigate further when possible
+- do not pressure the user to approve
+- do not assume the feature is unnecessary
+- keep it as Needs more information (Report-Only) when uncertainty remains
+
+### Simple finding presentation
+
+Default format — one point, then one decision:
+
+```text
+F<n> — <simple title>
+
+<2-4 short sentences on ONE important point.>
+
+<one question or one decision>
+
+1. ...
+2. ...
+3. ...
+```
+
+Example:
+
+```text
+F4 — Extra provider setup
+
+The app sends push notifications through Expo.
+
+I also found an interface and factory for switching providers, but I could
+not find another provider in use.
+
+Is another push provider planned?
+
+1. Yes
+2. No
+3. Not sure
+4. Show evidence
+```
+
+Then STOP.
+
+### Before applying a finding
+
+Internally prepare (and keep for the final report / on request):
+
+- Finding ID and title
+- Type, Priority, Confidence
+- Evidence, Impact
+- Why it should be changed
+- Exact proposed remediation
+- Expected files to change / create / delete
+- Expected dependency and behavior changes
+- Risk
+- Verification plan
+- For Unjustified Complexity: capability justification fields
+
+In chat, do **not** dump that list by default.
+
+Once enough information is known, use a simple approval prompt:
+
+```text
+F<n> — Suggested cleanup
+
+<2-4 short sentences: what you propose and that behavior should stay the same.>
+
+What do you want to do?
+
+1. Apply this change
+2. Change the approach
+3. Skip it
+4. Show details
+```
+
+Then STOP.
+
+Map choices to existing decisions:
+
+| Chat choice | Internal decision |
+|-------------|-------------------|
+| Apply this change | APPROVE |
+| Change the approach | MODIFY APPROACH |
+| Skip it | SKIP |
+| Show details | reveal formal fields; then re-ask |
+| (also support) Defer / Stop / Investigate | DEFER / STOP / INVESTIGATE |
+
+Do not modify anything until the user chooses **Apply this change** (APPROVE).
 
 Do not automatically simplify or delete working-but-unnecessary code.
 **APPROVE** is still required before modification.
@@ -653,7 +849,7 @@ delta check**. If conceptual complexity did not decrease, STOP and reassess.
 Do not change source.
 
 Update the proposed remediation according to human feedback and present it
-again for approval.
+again for approval (simple chat form).
 
 ### INVESTIGATE
 
@@ -661,12 +857,66 @@ Do not change source.
 
 Gather additional evidence needed to resolve uncertainty.
 
-After investigation:
+INVESTIGATE must also be conversational. Do **not** investigate everything and
+then dump the complete result.
+
+After investigation work:
+
+1. Identify the **most important conclusion** first.
+2. Explain that one point in 2-4 short sentences.
+3. Ask **one** follow-up decision.
+4. STOP.
+5. Continue chunk by chunk until enough information exists for a decision—
+   or until investigation can end early.
+
+Example first message after investigation:
+
+```text
+NS-R2 — Push adapter setup
+
+I checked how it is used.
+
+Email looks fine, so I would leave it alone.
+
+Push is different: both the generic PushAdapter and ExpoPushAdapter
+are used directly.
+
+Want to know why?
+
+1. Yes
+2. Skip this finding
+3. Show technical details
+```
+
+Then STOP.
+
+If the human chooses Yes, explain the next point only:
+
+```text
+The generic adapter handles sending.
+
+But Expo is still used directly for circuit checks and receipt polling.
+
+So the abstraction does not fully hide Expo.
+
+Want me to check whether this can safely be simplified?
+
+1. Yes
+2. Leave it for now
+3. Show code evidence
+```
+
+Then STOP.
+
+Internally, after investigation:
 
 - update confidence if justified
 - update priority if justified
 - reclassify Report-Only → Actionable only when evidence supports it
-- explain why the classification changed
+- keep the classification change explanation for the final report / Show details
+
+Do not dump those updates in chat unless the human asks or they are required
+for the immediate decision.
 
 Modification still requires separate **APPROVE**.
 
@@ -692,25 +942,38 @@ After applying ONE finding:
 1. Run the verification defined for that finding.
 2. Inspect the git diff.
 3. Confirm the actual change surface.
-4. Report:
+4. Keep the formal result for the final cleanup report.
+
+In chat, show a **simple** result by default (not the full formal template):
 
 ```text
-Finding:
-Files changed:
-Files created:
-Files deleted:
-Dependencies changed:
-Verification executed:
-Verification result:
-Behavior changes:
-Unexpected changes:
-Remaining risk:
-Complexity delta (Unjustified Complexity only):
+F<n> fixed.
+
+Changed:
+- <files changed or deleted>
+
+Checked:
+- <short verification results>
+- No unexpected files were created (or list surprises)
+
+Behavior:
+<expected behavior change, or none>
+
+Keep this change?
+
+1. Accept
+2. Revise
+3. Revert
+4. Show diff/details
+5. Stop
 ```
 
-Then stop again.
+Then STOP.
 
-Ask the human to choose: **ACCEPT**, **REVISE**, **REVERT**, **STOP**.
+Map: Accept → ACCEPT, Revise → REVISE, Revert → REVERT, Stop → STOP.
+Show diff/details reveals formal fields (files created/deleted, dependencies,
+verification executed/result, unexpected changes, remaining risk, complexity
+delta when relevant), then re-ask Keep this change?
 
 ### ACCEPT
 
@@ -722,7 +985,7 @@ Only then present the next unresolved finding.
 
 Keep the finding active.
 
-Explain the required adjustment and request approval before making
+Explain the required adjustment simply and request approval before making
 additional modifications if the adjustment expands the previously
 approved change.
 
@@ -750,12 +1013,13 @@ Any newly discovered issue must become a separate finding.
 
 Report-Only findings must also participate in the human loop.
 
-Present the finding and why it is report-only.
+In chat, explain simply that this **Needs more information** before any change.
+Use the simple finding presentation. Ask at most one question if needed.
 
-Allow: **INVESTIGATE**, **DEFER**, **SKIP**.
+Allow: **INVESTIGATE**, **DEFER**, **SKIP** (worded simply for the user).
 
-Do not offer **APPROVE** until sufficient evidence allows the finding to be
-reclassified as Actionable.
+Do not offer **APPROVE** / Apply until sufficient evidence allows the finding
+to be reclassified as Actionable (Safe to fix).
 
 Reclassification itself does not authorize modification.
 
@@ -763,15 +1027,18 @@ Reclassification itself does not authorize modification.
 
 Do not automatically modify them.
 
+In chat, explain simply that you recommend **Leave it alone**, unless the user
+wants more investigation.
+
 Allow the human to: **ACKNOWLEDGE**, **INVESTIGATE**, **PROMOTE FOR ANALYSIS**,
-**SKIP**.
+**SKIP** (worded simply).
 
 If promoted, analyze it as a new finding.
 Do not directly modify code.
 
 ### Session progress
 
-Maintain cleanup progress:
+Maintain cleanup progress **internally**:
 
 ```text
 Resolved:
@@ -783,6 +1050,15 @@ Pending report-only:
 ```
 
 Never silently drop a finding.
+
+Do **not** print session progress after every finding interaction.
+
+Show progress only:
+
+- when the human asks
+- when switching major phases
+- when the human stops
+- in the final report
 
 ---
 
