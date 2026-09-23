@@ -5,8 +5,9 @@ description: >-
   consistency, security, and structural quality while preserving intended
   behavior. Detect used-but-unnecessary and speculative AI-generated complexity.
   Prefer deletion and consolidation over new abstractions. Use when asked to
-  clean up, refactor safely, reduce tech debt, audit AI/vibe-coded repos, or
-  run code-cleanup in Analyze or Apply mode.
+  clean up, refactor safely, reduce tech debt, audit AI/vibe-coded repos, review
+  a branch/worktree diff for scope creep, or run code-cleanup in Analyze, Review,
+  or Apply mode.
 disable-model-invocation: true
 ---
 
@@ -24,7 +25,9 @@ modification is justified is a successful outcome.
 
 - User asks to clean up, tidy, simplify, or reduce debt in an existing repo
 - Repository was created or heavily modified with AI / vibe coding
-- User requests Analyze or Apply mode for `code-cleanup`
+- User requests Analyze, Review, or Apply mode for `code-cleanup`
+- User wants a diff-scoped check after an agent coding session (before
+  merge/commit) for scope creep or speculative additions
 
 ## When not to use
 
@@ -60,13 +63,63 @@ Understand the repository before modifying it.
 
 - [cleanup-checklist.md](references/cleanup-checklist.md) — technology-neutral audit checklist
 - [vibe-code-smells.md](references/vibe-code-smells.md) — AI/vibe-code smell investigation guide
+- [tooling-hints.md](references/tooling-hints.md) — optional per-language tools for HIGH-confidence mechanical evidence
 
 ## Operating modes
 
 ### ANALYZE
 
-Analyze the repository and produce findings and a cleanup plan.
-**Do not modify source files.**
+Analyze the repository (or a scoped module) and produce findings and a cleanup
+plan. **Do not modify source files.**
+
+### REVIEW
+
+Audit a **diff** — not the whole repository — for scope creep, unrelated
+changes, and speculative additions. Typical use: right after an agent coding
+session, before merge/commit.
+
+**Do not modify source files** during the audit itself. Remediations (including
+per-hunk revert) require the same Human-in-the-loop approval flow as APPLY.
+
+This formalizes [vibe-code-smells.md](references/vibe-code-smells.md) item 14
+(Unexpected diff expansion) — reference that smell; do not duplicate it.
+
+#### Diff scope resolution
+
+1. If on a branch with a parent, default to `git diff <parent>...HEAD`
+   (three-dot / merge-base diff, **not** a plain two-dot diff, so commits that
+   landed on the parent after branching are not included).
+2. If there is no branch diff (still on the base branch, or nothing committed
+   yet), fall back to uncommitted worktree changes (`git status` / `git diff`).
+3. Let the user override the comparison ref explicitly.
+
+#### Hunk classification
+
+For each changed hunk, classify using these labels. Map them onto the existing
+Finding type / confidence / priority system — do not invent a parallel one:
+
+| Hunk label | Meaning | Typical mapping |
+|------------|---------|-----------------|
+| **Intended** | Matches the stated goal of the change | Non-actionable (or note only) |
+| **Unrelated but harmless** | Outside stated scope, low risk | Non-actionable observation |
+| **Scope creep** | Outside stated scope; adds real change surface | Finding (often Maintainability); Actionable or Report-only |
+| **Speculative addition** | New capability with no demonstrated requirement | **Unjustified Complexity** + Necessity analysis |
+
+#### Review scope rule
+
+Only touched files/hunks are in scope for DISCOVER/AUDIT context.
+Surrounding untouched code may be read for context only — **never** propose
+changes to untouched code under REVIEW.
+
+#### Review output
+
+Use the same Actionable / Report-only / Non-actionable buckets as Analyze,
+scoped to the diff.
+
+For hunks classified **Scope creep** or **Speculative addition**, offer a
+per-hunk revert option under Human-in-the-loop (e.g. targeted patch revert, or
+`git checkout <parent> -- <path>` when whole-file revert is appropriate).
+**Do not auto-revert.**
 
 ### APPLY
 
@@ -78,16 +131,20 @@ request post-change human review before continuing.
 
 If the user does not specify a mode, ask which mode to use. If they say
 "cleanup" without mode, default to **ANALYZE** first, then offer Apply under
-human-in-the-loop review.
+human-in-the-loop review. If they ask to check a recent agent diff or branch
+before merge, prefer **REVIEW**.
 
 ---
 
 ## Workflow
 
 Follow these stages in order. Do not skip Discover or Baseline before Audit.
-In Analyze mode, stop after Plan (produce the Analyze report; do not Clean).
-In Apply mode, after Analyze classification exists, follow
+In Analyze or Review mode, stop after Plan (produce the report; do not Clean)
+unless the human later approves remediations via Human-in-the-loop.
+In Apply mode, after classification exists, follow
 **Human-in-the-loop (Apply)** — one finding at a time with human approval.
+In Review mode, DISCOVER/AUDIT are limited to the resolved diff; remediations
+(including hunk reverts) use the same Human-in-the-loop gates as Apply.
 
 ### 1. DISCOVER
 
@@ -97,9 +154,18 @@ In Apply mode, after Analyze classification exists, follow
 - Identify architecture, modules, entry points, and boundaries.
 - Identify dependencies.
 - Identify tests, build, lint, typecheck, and static-analysis commands.
+- Prefer optional mechanical tools from [tooling-hints.md](references/tooling-hints.md)
+  when present or installable for dead code / unused deps (not required).
 - Search for existing implementations before assuming functionality is missing.
 - Determine dominant repository conventions.
 - Do not infer architecture from a single file.
+
+#### Scoping (Analyze / Review)
+
+- Support a user-specified directory or module scope.
+- For repos too large for a single pass, recommend **one report per module**
+  instead of one attempt at full-tree coverage.
+- In Review mode, further restrict to the resolved diff (touched paths only).
 
 ### 2. BASELINE
 
@@ -108,6 +174,16 @@ In Apply mode, after Analyze classification exists, follow
 - Run lint/typecheck/static analysis when configured.
 - Record pre-existing failures.
 - Never weaken tests or configuration just to obtain a green baseline.
+
+#### Verification fallback (no automated coverage)
+
+When the area under review has **no automated test coverage**:
+
+- Require a **manual smoke-check** (a short list of steps to run/observe
+  behavior) before related findings can be marked verified.
+- If no smoke-check is feasible, **cap confidence at MEDIUM** and default
+  those findings to **Report-only**. Do not treat "build passed" alone as
+  sufficient verification.
 
 ### 3. AUDIT
 
@@ -190,6 +266,7 @@ Directly demonstrated through one or more of:
 - failing/passing tests
 - compiler/build output
 - lint/static-analysis output
+- optional mechanical dead-code / unused-dep tools (see tooling-hints.md)
 - reproducible runtime behavior
 - clear code/configuration contradiction
 
@@ -423,6 +500,10 @@ Keep the plan minimal. Prefer few high-confidence changes over many speculative 
 
 Follow **Human-in-the-loop (Apply)**.
 
+**Git mechanics before CLEAN begins:** create (or confirm) a dedicated working
+branch for the cleanup session. Do not apply cleanup commits on a shared base
+branch without explicit human instruction.
+
 Apply source changes only after individual human **APPROVE** for that finding
 ID. Apply at most one finding per approval cycle. Do not batch findings unless
 the human explicitly asks to batch those specific finding IDs.
@@ -436,6 +517,11 @@ report, and stop for human **ACCEPT** / **REVISE** / **REVERT** / **STOP**.
 Also run broader build/tests/lint/typecheck/static analysis when they are
 part of the finding's verification plan or needed to confirm no regression.
 
+If the changed area has **no automated coverage**, require the manual
+smoke-check from Baseline's verification fallback before treating the finding
+as verified. If no smoke-check is feasible, do not mark verified; keep or
+reclassify as Report-only and cap confidence at MEDIUM.
+
 Inspect the diff for:
 
 - no accidental files
@@ -445,7 +531,7 @@ Inspect the diff for:
 - no unnecessary dependencies
 
 If the diff expands unexpectedly, stop and reassess (do not continue).
-
+See [vibe-code-smells.md](references/vibe-code-smells.md) item 14.
 ### 9. REPORT
 
 #### Analyze mode
@@ -536,6 +622,19 @@ decisions required.
 
 For Analyze mode, Modification Summary values should normally remain None.
 
+#### Review mode
+
+Same Actionable / Report-only / Non-actionable structure as Analyze, but:
+
+- State the resolved diff scope (`<parent>...HEAD`, worktree, or user override)
+- State the stated goal of the change (from user or PR/commit message)
+- Classify touched hunks: Intended / Unrelated but harmless / Scope creep /
+  Speculative addition
+- Cleanup Plan may include per-hunk revert candidates (HITL only; no auto-revert)
+- Modification Summary remains None until a human-approved remediation runs
+
+Title: `# Code Cleanup Review`
+
 #### Apply mode
 
 When all findings have been reviewed or the human stops the session, report:
@@ -577,14 +676,26 @@ detail is fine; do not repeat the same evidence in multiple sections.
 
 ## Human-in-the-loop (Apply)
 
-Mandatory for all source modifications. Sequence:
+Mandatory for all source modifications (including Review remediations and
+per-hunk reverts). Sequence:
 
-ANALYZE → classify findings → human review → fix **ONE** finding → verify →
-human review → continue to next finding
+ANALYZE or REVIEW → classify findings → human review → fix **ONE** finding →
+verify → human review → continue to next finding
 
 Cleanup logic, safety rules, priority, confidence, necessity analysis, and
 approval requirements are unchanged. This section also defines how to talk to
 the human in APPLY chat.
+
+### Git mechanics (Apply)
+
+- **Before CLEAN:** create or confirm a dedicated working branch for this
+  cleanup session.
+- **On ACCEPT:** create exactly **one commit** for that finding. Include the
+  finding ID in the commit message (example:
+  `F3: remove unused ExpoPushAdapter fallback`).
+- **On REVERT:** use `git revert <that finding's commit sha>` — not a manual
+  undo of files. Do not revert unrelated commits or pre-existing user changes.
+- Record the commit SHA with the finding in session progress / final report.
 
 ### Human-in-the-loop rule
 
@@ -979,6 +1090,9 @@ delta when relevant), then re-ask Keep this change?
 
 Mark the finding resolved.
 
+Create exactly one git commit for this finding (finding ID in the message).
+Record the commit SHA.
+
 Only then present the next unresolved finding.
 
 ### REVISE
@@ -991,12 +1105,18 @@ approved change.
 
 ### REVERT
 
-Revert ONLY changes introduced for that finding.
+Revert ONLY changes introduced for that finding by running
+`git revert <that finding's commit sha>`.
 
+Do not manually undo files when a commit exists.
 Do not revert pre-existing user changes or unrelated working-tree changes.
+Do not revert other findings' commits.
 
 Verify the revert and report the result.
 
+For **Review** remediations that revert a hunk before a cleanup commit exists,
+use a targeted patch revert or `git checkout <parent> -- <path>` only after
+human APPROVE, scoped to the approved paths/hunks.
 ### Important change-scope rule
 
 While fixing finding `F<n>`:

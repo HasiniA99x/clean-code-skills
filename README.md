@@ -16,9 +16,10 @@ CLI, API, or cleanup engine.
 3. **Audit** for concrete maintainability, correctness, security, structural
    issues, and AI-generated accidental or speculative complexity
 4. **Classify and decide** what is safe to change vs report-only
-5. Optionally **apply** small, verified cleanups that preserve intended behavior
+5. Optionally **review** a branch or worktree diff for scope creep before merge
+6. Optionally **apply** small, verified cleanups that preserve intended behavior
    under mandatory human-in-the-loop review (one finding at a time)
-6. **Report** what changed, what remains, and what is uncertain
+7. **Report** what changed, what remains, and what is uncertain
 
 The skill strongly prefers simplification, consolidation, and deletion over
 creating new files, abstractions, or dependencies. **Used does not mean
@@ -35,7 +36,8 @@ clean-code-skills/
     ├── SKILL.md
     └── references/
         ├── cleanup-checklist.md
-        └── vibe-code-smells.md
+        ├── vibe-code-smells.md
+        └── tooling-hints.md
 ```
 
 | Path | Role |
@@ -43,15 +45,17 @@ clean-code-skills/
 | `code-cleanup/SKILL.md` | Skill entrypoint: principles, modes, workflow, hard constraints, guards, report format |
 | `code-cleanup/references/cleanup-checklist.md` | Technology-neutral audit checklist |
 | `code-cleanup/references/vibe-code-smells.md` | Investigation guide for AI/vibe-code smells |
+| `code-cleanup/references/tooling-hints.md` | Optional per-language tools for HIGH-confidence mechanical evidence |
 
-## Analyze vs Apply
+## Analyze vs Review vs Apply
 
 | Mode | Behavior |
 |------|----------|
-| **ANALYZE** | Discover → Baseline → Audit → Classify → Decide → Plan → Report. **Does not modify source files.** |
-| **APPLY** | Human-guided: present one finding, wait for approval, apply only that finding, verify, show the diff, wait for ACCEPT/REVISE/REVERT, then continue. **No automatic modification.** |
+| **ANALYZE** | Discover → Baseline → Audit → Classify → Decide → Plan → Report (full repo or scoped module). **Does not modify source files.** |
+| **REVIEW** | Diff-scoped audit (`<parent>...HEAD` or worktree) for Intended / Unrelated / Scope creep / Speculative addition. Remediations (including per-hunk revert) only via Human-in-the-loop. |
+| **APPLY** | Human-guided: dedicated branch; present one finding; wait for approval; apply only that finding; verify; one commit per ACCEPT; REVERT via `git revert`; wait for ACCEPT/REVISE/REVERT; then continue. **No automatic modification.** |
 
-If mode is unspecified, prefer **ANALYZE** first, then Apply under human-in-the-loop review.
+If mode is unspecified, prefer **ANALYZE** first, then Apply under human-in-the-loop review. For “check this agent diff before merge,” prefer **REVIEW**.
 
 Details live in [`code-cleanup/SKILL.md`](code-cleanup/SKILL.md).
 
@@ -64,7 +68,9 @@ repository** that is not this skills repo.
 Example prompts:
 
 - `Run code-cleanup in Analyze mode on this repository.`
+- `Run code-cleanup in Review mode against the parent branch diff.`
 - `Run code-cleanup in Apply mode. Start with finding F1 only.`
+
 ## How to test the skill
 
 Evaluate the skill against multiple real repositories—not against this
@@ -98,6 +104,7 @@ definition repo alone.
 4. Inspect the diff and verification results.
 5. Rate each change Keep / Questionable / Revert.
 6. Record metrics; refine `SKILL.md` or references only when patterns repeat.
+7. Optionally run **REVIEW** on an agent-produced branch before merge.
 
 ## Design stance
 

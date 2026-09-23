@@ -65,6 +65,12 @@ reach a line-count target.
 
 Use when code is referenced and working, but may still be unjustified.
 
+Canonical rules: **Necessity analysis** in `SKILL.md` (capability justification,
+weak justifications, justification hierarchy, intentional boundaries,
+do-not-over-correct). Do not restate those criteria here.
+
+Checklist only:
+
 - [ ] Is this complexity required by current behavior?
 - [ ] What capability disappears if removed, consolidated, or specialized?
 - [ ] Is that capability actually required (current or committed near-term)?
@@ -77,8 +83,8 @@ Use when code is referenced and working, but may still be unjustified.
       simply?
 - [ ] Would simplification reduce conceptual machinery (not merely replace it)?
 
-**Used ≠ necessary.** Absence of immediate evidence is not proof of
-unnecessary code—prefer Report-Only when uncertain.
+Prefer Report-Only when uncertain. Optional mechanical evidence:
+[tooling-hints.md](tooling-hints.md).
 
 ---
 

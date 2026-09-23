@@ -338,9 +338,12 @@ When uncertain, report the finding; do not change the code.
 **What to investigate**
 - Root cause: tooling auto-format, wrong scope, cascading renames
 - Whether each file change maps to the stated plan item
+- Prefer **REVIEW** mode (`SKILL.md`) for a formal diff-scoped audit after
+  agent sessions
 
 **When it is safe to clean**
-- Revert unrelated hunks; re-apply only the planned minimal change
+- Revert unrelated hunks under Human-in-the-loop; re-apply only the planned
+  minimal change
 - Re-run verify on the narrowed diff
 
 **When NOT to automatically change it**
@@ -375,31 +378,20 @@ When uncertain, report the finding; do not change the code.
 
 ---
 
-## 16. Used-but-unnecessary code
+## 16–23. Used-but-unnecessary / speculative complexity (smell index)
+
+Full necessity rules live in **Necessity analysis** in `SKILL.md`. Use that
+section for capability justification, weak justifications, hierarchy,
+boundaries, and classification safety. Below: smell-specific **symptoms** only.
+
+### 16. Used-but-unnecessary code
 
 **Symptoms**
 - Code is imported, called, compiles, and may have tests
 - Machinery exists mainly for flexibility, purity, or "niceness"
 - Removing or specializing it would not remove a demonstrated product behavior
 
-**What to investigate**
-- Current required capability vs additional capability introduced
-- Contracts, config, tests, history, and platform layers that justify the extra machinery
-- Whether a simpler existing-pattern implementation preserves required behavior
-
-**When it is safe to clean**
-- Capability justification shows additional capability is unused and uncommitted
-- Simplification is small, verifiable, and human-approved
-- Conceptual complexity decreases
-
-**When NOT to automatically change it**
-- Absence of immediate evidence only (not proof it is unnecessary)
-- Boundary, contract, security, or operational need is plausible but unclear
-- Cleanup would replace one architecture with a preferred different one
-
----
-
-## 17. Speculative / nice-to-have functionality
+### 17. Speculative / nice-to-have functionality
 
 **Symptoms**
 - Working capability with no demonstrated current or committed requirement
@@ -407,131 +399,47 @@ When uncertain, report the finding; do not change the code.
 - Optional features enabled "just in case"
 - AI-added helpers that product flows never need
 
-**What to investigate**
-- Product docs, configs, deploy modes, and tests for real use
-- Whether capability is part of an external/public contract
-- Distinction from dead code (this code *is* wired)
-
-**When it is safe to clean**
-- No current/committed requirement; required paths remain after removal
-- Human APPROVE after capability-justification presentation
-
-**When NOT to automatically change it**
-- Near-term committed roadmap or external consumer is plausible
-- Removing it changes observable product behavior without approval
-
----
-
-## 18. Premature extensibility
+### 18. Premature extensibility
 
 **Symptoms**
 - Extensibility hooks with no demonstrated extension
 - Provider switching with one fixed provider
 - Plugin/registry systems for a single registrant
 
-**What to investigate**
-- Actual alternate implementations, config selectors, and tests
-- Whether the seam is a repository-established boundary
-
-**When it is safe to clean**
-- Specialize or call the concrete implementation directly with equal behavior
-
-**When NOT to automatically change it**
-- Plugin loading, DI, or public SDK contracts require the seam
-
----
-
-## 19. Premature scalability
+### 19. Premature scalability
 
 **Symptoms**
 - Caching, queues, sharding, pooling, or fan-out with no demonstrated load need
 - Scalability infrastructure for hypothetical traffic
 
-**What to investigate**
-- Measured or documented performance/load requirements
-- Whether platform/framework already provides the capability
-- Failure modes if the layer is removed
-
-**When it is safe to clean**
-- No demonstrated performance problem; simpler path preserves correctness
-
-**When NOT to automatically change it**
-- Deployment/SLAs or known production load depend on it
-- Removal risk is unverified (report-only)
-
----
-
-## 20. Hypothetical configuration
+### 20. Hypothetical configuration
 
 **Symptoms**
 - Configuration options with no demonstrated current use
 - Modes/flags for unsupported environments
 - Env vars read once and always defaulted the same way
 
-**What to investigate**
-- Deploy manifests, docs, and runtime values across environments
-- Whether options are part of a public/operator contract
-
-**When it is safe to clean**
-- Options never selected; simplifying config preserves current behavior
-
-**When NOT to automatically change it**
-- External operators or undocumented deploy docs may depend on them
-
----
-
-## 21. Redundant resilience
+### 21. Redundant resilience
 
 **Symptoms**
 - Multiple retry layers "for safety"
 - Duplicate timeouts/circuit breakers wrapping the same call
 - Fallbacks that hide errors without a required recovery story
 
-**What to investigate**
-- Actual failure requirements and existing platform resilience
-- Whether redundancy changes correctness or observability
-
-**When it is safe to clean**
-- One intentional resilience path remains; behavior and failure visibility preserved
-
-**When NOT to automatically change it**
-- Failure/ops requirements are unclear
-- Security or data-integrity paths rely on the defenses
-
----
-
-## 22. Unnecessary compatibility layers
+### 22. Unnecessary compatibility layers
 
 **Symptoms**
 - Compatibility code for unsupported versions
 - Shims bridging APIs the repo no longer targets
 - Dual serializers/clients "for migration" with migration complete
 
-**What to investigate**
-- Supported version matrix and live callers
-- Whether external clients still need the layer
-
-**When it is safe to clean**
-- Compatibility requirement is demonstrably gone; cutover complete
-
-**When NOT to automatically change it**
-- External clients or version support commitments remain
-
----
-
-## 23. Unnecessary states / branches
+### 23. Unnecessary states / branches
 
 **Symptoms**
 - Additional states or branches that support no demonstrated behavior
 - Enums/status machines with unused values still threaded everywhere
 - Defensive branches for impossible or already-protected states
 
-**What to investigate**
-- Reachability from real inputs and configs
-- Whether branches encode undocumented business rules
-
-**When it is safe to clean**
-- Branches are unreachable under demonstrated requirements; tests confirm
-
-**When NOT to automatically change it**
-- Domain rules are unclear; dynamic inputs may hit the branch
+For items 16–23: investigate and decide using `SKILL.md` Necessity analysis.
+When safe to clean / when not: same gates as SKILL (evidence, HITL APPROVE,
+Report-only when uncertain, preserve intentional boundaries).
