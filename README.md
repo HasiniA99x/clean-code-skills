@@ -1,77 +1,121 @@
 # clean-code-skills
 
-Experimental **skill definitions** for improving existing codebases—especially
-AI/vibe-coded ones—by removing waste and simplifying code. Not an application,
-CLI, or cleanup engine. Not primarily an audit-report tool.
+Reusable AI coding skill that **cleans existing code**. It removes waste, simplifies bulky code, and fixes real quality, performance, and security issues — without changing how the app is supposed to behave.
 
-## What `code-cleanup` does
+This repo is skill docs only. There is no CLI or app to run. Any coding agent that can follow a `SKILL.md` file can use it (Cursor, Claude Code, GitHub Copilot agent, Windsurf, Continue, and similar tools).
 
-**Mission:** improve the codebase. Analysis exists only to make cleanup safe.
+## How to use
 
-**Target:** minimum justified complexity + required behavior preserved + better
-quality + less unnecessary work + safer code.
+### 1. Add the skill
 
-Default mode **CLEAN**:
+Copy the `code-cleanup/` folder into the skills location your tool uses.
+
+**This project only** (typical paths):
+
+- `.cursor/skills/code-cleanup/`
+- `.claude/skills/code-cleanup/`
+- `.github/skills/code-cleanup/`
+- `.agents/skills/code-cleanup/`
+
+**All your projects** (typical paths):
+
+- `~/.cursor/skills/code-cleanup/`
+- `~/.claude/skills/code-cleanup/`
+
+If your tool does not auto-load skills, open [`code-cleanup/SKILL.md`](code-cleanup/SKILL.md) in the chat or paste:
 
 ```text
-Understand → Baseline → Find next cleanup → Understand why → Fixability Gate
-→ Propose → Human approves → Fix → Verify → Accept → Next
+Follow the code-cleanup skill at <path-to>/code-cleanup/SKILL.md
 ```
 
-Until nothing else is clearly worth changing safely.
+Then open the **repo you want cleaned** (not this skills repo) and start an agent chat.
 
-Optional (explicit only):
+### 2. Ask it to clean
 
-- **ANALYZE** — full/module findings report (no edits)
-- **REVIEW** — diff/branch/PR scope-creep check
+In the target repo, say one of:
 
-Prefer REMOVE → CONSOLIDATE → SPECIALIZE → SIMPLIFY → REUSE.
-**Used ≠ necessary.** Do not increase conceptual complexity as "cleanup."
-
-## Repository structure
-
-```
-clean-code-skills/
-├── README.md
-└── code-cleanup/
-    ├── SKILL.md
-    └── references/
-        ├── cleanup-checklist.md
-        ├── vibe-code-smells.md
-        └── tooling-hints.md
+```text
+Run code-cleanup on this repository.
 ```
 
-| Path | Role |
-|------|------|
-| `code-cleanup/SKILL.md` | Mission, CLEAN workflow, safety, HITL, verify |
-| `references/cleanup-checklist.md` | Search checklist + Analyze classification detail |
-| `references/vibe-code-smells.md` | AI/vibe smell symptoms |
-| `references/tooling-hints.md` | Optional mechanical tools (+ optional Jev note) |
+```text
+Clean this repo. Start with the notification service.
+```
 
-## Modes
+```text
+Simplify the vibe-coded parts of apps/api.
+```
 
-| Mode | When |
-|------|------|
-| **CLEAN** (default; `APPLY` alias) | "clean / cleanup / improve / simplify / remove vibe code" |
-| **ANALYZE** | Explicit audit/report request |
-| **REVIEW** | Explicit diff/branch/PR/agent-change review |
+That starts **CLEAN** (default). It does **not** write a full audit first.
 
-## Example prompts
+It will:
 
-- `Run code-cleanup on this repository.` → CLEAN
-- `Run code-cleanup in Analyze mode.`
-- `Run code-cleanup in Review mode against the parent branch diff.`
+1. Understand the repo
+2. Find **one** worthwhile cleanup
+3. Show a short summary and ask you **one** question
+4. Wait for your answer
+5. Fix only that item (after you say Yes)
+6. Verify, then ask you to keep or revert
+7. Repeat until nothing else is clearly worth changing
 
-## Testing the skill
+You approve every source change. One cleanup at a time.
 
-Try: clean repo (expect few/no changes), known-debt repo, vibe-coded repo.
-Measure: accepted fixes, wasted human asks, net files/deps/abstractions removed,
-change-budget stops, regressions, Keep/Questionable/Revert ratings.
+### 3. How to answer in chat
 
-## Design stance
+Each message is short: what it found, what it wants to do, then one question.
 
-- Fix the code; don't audit for its own sake
-- One cleanup at a time; human approval mandatory
-- Uncertainty → leave alone and continue
-- Optional Jev may gate structured safety checks only — not required
-- No subagents, CLI, or cleanup product in this repo
+Example:
+
+```text
+F4 — Extra provider setup
+
+What I found:
+- The app sends push through Expo only
+- Extra factory/interface exists for switching providers
+
+What I want to do:
+- Remove the unused switch setup and keep Expo
+
+Apply this cleanup?
+
+1. Yes
+2. Show why
+3. Change approach
+4. Skip
+5. Stop
+```
+
+Reply with the number or the same words (`Yes`, `Skip`, …). Use **Show why** if you want more detail.
+
+After a fix it asks **Keep this cleanup?** (`Accept` / `Revise` / `Revert` / `Show diff` / `Stop`).
+
+### 4. Other modes (only if you ask)
+
+| Mode | When to use | Example |
+|------|-------------|--------|
+| **CLEAN** (default) | Fix the code | `Run code-cleanup on this repository.` |
+| **ANALYZE** | Report only, no edits | `Run code-cleanup in Analyze mode.` |
+| **REVIEW** | Check a branch/PR/agent diff | `Run code-cleanup in Review mode against the parent branch.` |
+
+You can also limit scope: `Clean only apps/notification-service.`
+
+## What’s in this repo
+
+```
+code-cleanup/
+├── SKILL.md                 # agent instructions
+└── references/
+    ├── cleanup-checklist.md
+    ├── vibe-code-smells.md
+    └── tooling-hints.md
+```
+
+You normally only invoke the skill. The agent reads the references when needed.
+
+## What it will not do
+
+- Change product behavior or public APIs without your approval
+- Rewrite the architecture because another design looks nicer
+- Add files, layers, or dependencies unless truly needed
+- Commit after every fix (commits only if you ask)
+- Keep going when remaining issues are taste, guesses, or unsafe to change
