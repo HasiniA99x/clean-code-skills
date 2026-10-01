@@ -119,3 +119,12 @@ You normally only invoke the skill. The agent reads the references when needed.
 - Add files, layers, or dependencies unless truly needed
 - Commit after every fix (commits only if you ask)
 - Keep going when remaining issues are taste, guesses, or unsafe to change
+
+## Benchmark
+
+Evaluate this skill against a seeded NestJS app:
+
+- Target repo: [vibe-cleanup-benchmark](https://github.com/HasiniA99x/vibe-cleanup-benchmark)
+- Human gold set, scoring rules, and a reference-run score: [`docs/vibe-cleanup-benchmark-eval.md`](docs/vibe-cleanup-benchmark-eval.md)
+
+Keep the gold set **outside** the benchmark checkout when the cleaner runs (blind evaluation).
