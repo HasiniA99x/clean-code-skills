@@ -43,13 +43,9 @@ classification model. A tool report is not automatic permission to delete.
 | Unused code | IDE inspections, Error Prone, etc. | Reflection / SPI / Spring can hide use |
 | Unused dependencies | Maven/Gradle dependency plugins | Check annotation processors |
 
-## General
+## Optional Jev
 
-- Prefer **repo-configured** scripts (`package.json`, `Makefile`, CI jobs) over
-  inventing new toolchains mid-cleanup.
-- Do not add tooling dependencies under the label of cleanup unless the human
-  explicitly approves.
-- Failed tool runs are not evidence — fix the command or use another method
-  (see Repository search guard in `SKILL.md`).
-- Generated and dependency directories remain out of scope as application-usage
-  evidence unless specifically relevant.
+If Jev is available, it may only evaluate structured safety evidence
+(budget exceeded, unexpected files, scope, complexity increase) as
+`ALLOW` / `STOP` / `HUMAN_REVIEW`. It is not required and must not replace
+agent reasoning or code edits. See `SKILL.md`.

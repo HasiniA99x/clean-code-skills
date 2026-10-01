@@ -1,868 +1,259 @@
 ---
 name: code-cleanup
 description: >-
-  Safely analyze and clean existing codebases for maintainability, readability,
-  consistency, security, and structural quality while preserving intended
-  behavior. Detect used-but-unnecessary and speculative AI-generated complexity.
-  Prefer deletion and consolidation over new abstractions. Use when asked to
-  clean up, refactor safely, reduce tech debt, audit AI/vibe-coded repos, review
-  a branch/worktree diff for scope creep, or run code-cleanup in Analyze, Review,
-  or Apply mode.
+  Improve existing codebases—especially AI/vibe-coded ones—by removing waste,
+  simplifying bulky code, fixing evidenced quality/performance/security issues,
+  and preserving required behavior. Default mode CLEAN: find → understand →
+  propose → human approves → fix → verify → continue. Analyze and Review only
+  when explicitly requested. Not an audit-report generator.
 disable-model-invocation: true
 ---
 
 # Code Cleanup
 
-Reusable engineering skill for improving an existing codebase without creating
-more unnecessary code. This is not a style guide and not a mandate to apply
-SOLID, DRY, Clean Architecture, or design patterns. Those ideas are reasoning
-tools only when they reduce a concrete problem in the current repository.
+**The purpose of this skill is to improve the codebase, not to produce an
+audit report. Analysis, classification, and reporting exist only to make
+cleanup safe.**
 
-A mature codebase may require **zero** cleanup changes. Concluding that no
-modification is justified is a successful outcome.
+Clean existing codebases, especially AI/vibe-coded ones, by removing
+unnecessary code and complexity, simplifying bulky implementations, improving
+maintainability, fixing evidenced performance and security problems, and
+preserving required behavior.
 
-## When to use
+**Target outcome:** minimum justified complexity + required behavior preserved
++ better quality + less unnecessary work + safer code.
 
-- User asks to clean up, tidy, simplify, or reduce debt in an existing repo
-- Repository was created or heavily modified with AI / vibe coding
-- User requests Analyze, Review, or Apply mode for `code-cleanup`
-- User wants a diff-scoped check after an agent coding session (before
-  merge/commit) for scope creep or speculative additions
+This is a **code cleanup / fixing** skill — not primarily a dead-code analyzer,
+audit tool, or review-report generator.
 
-## When not to use
+A mature codebase may need **zero** changes. Stopping safely is success.
 
-- Greenfield feature work or intentional redesign
-- Style-only reformatting with no maintainability problem
-- Tasks that require changing business behavior or public contracts
+## Philosophy
 
-## Core principles
+```text
+REMOVE WHAT SHOULD NOT EXIST
+        ↓
+SIMPLIFY WHAT MUST EXIST
+        ↓
+IMPROVE CODE QUALITY
+        ↓
+REMOVE UNNECESSARY WORK
+        ↓
+FIX SECURITY PROBLEMS
+        ↓
+VERIFY
+        ↓
+REPEAT
+```
 
-Prefer:
-
-- simplification over abstraction
-- consolidation over creation
-- deletion over duplication
-- existing repository patterns over introducing new patterns
-- small verified changes over broad rewrites
-- evidence over assumptions
-- reporting uncertainty instead of guessing
+Prefer: **REMOVE → CONSOLIDATE → SPECIALIZE → SIMPLIFY → REUSE EXISTING CODE**
+before introducing anything new.
 
 **Used does not mean necessary. Working does not mean justified.**
-Evaluate whether complexity supports a demonstrated current requirement,
-contract, invariant, integration, operational need, or established repository
-boundary. Prefer the simplest implementation that preserves those
-demonstrated responsibilities.
-
-Do not interpret this as permission to aggressively delete working code.
-Absence of immediately visible evidence is NOT proof that something is
-unnecessary.
-
-Understand the repository before modifying it.
 
 ## References (read when needed)
 
-- [cleanup-checklist.md](references/cleanup-checklist.md) — technology-neutral audit checklist
-- [vibe-code-smells.md](references/vibe-code-smells.md) — AI/vibe-code smell investigation guide
-- [tooling-hints.md](references/tooling-hints.md) — optional per-language tools for HIGH-confidence mechanical evidence
+- [cleanup-checklist.md](references/cleanup-checklist.md) — checklist + Analyze classification detail
+- [vibe-code-smells.md](references/vibe-code-smells.md) — AI/vibe-code smells
+- [tooling-hints.md](references/tooling-hints.md) — optional mechanical evidence tools
 
 ## Operating modes
 
-### ANALYZE
+### CLEAN (default)
 
-Analyze the repository (or a scoped module) and produce findings and a cleanup
-plan. **Do not modify source files.**
+Normal workflow. If the user says clean / cleanup / improve / simplify /
+remove vibe code / fix code quality / reduce unnecessary code — or does not
+specify a mode — use **CLEAN**.
 
-### REVIEW
+Do **not** generate a full analysis report first.
 
-Audit a **diff** — not the whole repository — for scope creep, unrelated
-changes, and speculative additions. Typical use: right after an agent coding
-session, before merge/commit.
+`APPLY` is an alias for CLEAN.
 
-**Do not modify source files** during the audit itself. Remediations (including
-per-hunk revert) require the same Human-in-the-loop approval flow as APPLY.
+### REVIEW (optional)
 
-This formalizes [vibe-code-smells.md](references/vibe-code-smells.md) item 14
-(Unexpected diff expansion) — reference that smell; do not duplicate it.
+Only when explicitly asked to inspect a **diff / branch / PR / recent agent
+changes**. Diff-scoped scope-creep check. Remediations still require HITL.
+Details: see Review section below.
 
-#### Diff scope resolution
+### ANALYZE (optional)
 
-1. If on a branch with a parent, default to `git diff <parent>...HEAD`
-   (three-dot / merge-base diff, **not** a plain two-dot diff, so commits that
-   landed on the parent after branching are not included).
-2. If there is no branch diff (still on the base branch, or nothing committed
-   yet), fall back to uncommitted worktree changes (`git status` / `git diff`).
-3. Let the user override the comparison ref explicitly.
-
-#### Hunk classification
-
-For each changed hunk, classify using these labels. Map them onto the existing
-Finding type / confidence / priority system — do not invent a parallel one:
-
-| Hunk label | Meaning | Typical mapping |
-|------------|---------|-----------------|
-| **Intended** | Matches the stated goal of the change | Non-actionable (or note only) |
-| **Unrelated but harmless** | Outside stated scope, low risk | Non-actionable observation |
-| **Scope creep** | Outside stated scope; adds real change surface | Finding (often Maintainability); Actionable or Report-only |
-| **Speculative addition** | New capability with no demonstrated requirement | **Unjustified Complexity** + Necessity analysis |
-
-#### Review scope rule
-
-Only touched files/hunks are in scope for DISCOVER/AUDIT context.
-Surrounding untouched code may be read for context only — **never** propose
-changes to untouched code under REVIEW.
-
-#### Review output
-
-Use the same Actionable / Report-only / Non-actionable buckets as Analyze,
-scoped to the diff.
-
-For hunks classified **Scope creep** or **Speculative addition**, offer a
-per-hunk revert option under Human-in-the-loop (e.g. targeted patch revert, or
-`git checkout <parent> -- <path>` when whole-file revert is appropriate).
-**Do not auto-revert.**
-
-### APPLY
-
-Run a mandatory human-in-the-loop session: present findings for individual
-human decisions, apply at most one approved finding at a time, verify, then
-request post-change human review before continuing.
-
-**No finding may be modified automatically.**
-
-If the user does not specify a mode, ask which mode to use. If they say
-"cleanup" without mode, default to **ANALYZE** first, then offer Apply under
-human-in-the-loop review. If they ask to check a recent agent diff or branch
-before merge, prefer **REVIEW**.
+Only when explicitly asked for an analysis, audit, report, or full findings
+list. Produces baseline, findings, plan — **no source edits**.
 
 ---
 
-## Workflow
-
-Follow these stages in order. Do not skip Discover or Baseline before Audit.
-In Analyze or Review mode, stop after Plan (produce the report; do not Clean)
-unless the human later approves remediations via Human-in-the-loop.
-In Apply mode, after classification exists, follow
-**Human-in-the-loop (Apply)** — one finding at a time with human approval.
-In Review mode, DISCOVER/AUDIT are limited to the resolved diff; remediations
-(including hunk reverts) use the same Human-in-the-loop gates as Apply.
-
-### 1. DISCOVER
-
-- Read repository instructions and documentation (`README`, `AGENTS.md`,
-  `CONTRIBUTING`, `.cursor/rules`, etc.).
-- Inspect repository structure.
-- Identify architecture, modules, entry points, and boundaries.
-- Identify dependencies.
-- Identify tests, build, lint, typecheck, and static-analysis commands.
-- Prefer optional mechanical tools from [tooling-hints.md](references/tooling-hints.md)
-  when present or installable for dead code / unused deps (not required).
-- Search for existing implementations before assuming functionality is missing.
-- Determine dominant repository conventions.
-- Do not infer architecture from a single file.
-
-#### Scoping (Analyze / Review)
-
-- Support a user-specified directory or module scope.
-- For repos too large for a single pass, recommend **one report per module**
-  instead of one attempt at full-tree coverage.
-- In Review mode, further restrict to the resolved diff (touched paths only).
-
-### 2. BASELINE
-
-- Run available build/compile.
-- Run existing tests.
-- Run lint/typecheck/static analysis when configured.
-- Record pre-existing failures.
-- Never weaken tests or configuration just to obtain a green baseline.
-
-#### Verification fallback (no automated coverage)
-
-When the area under review has **no automated test coverage**:
-
-- Require a **manual smoke-check** (a short list of steps to run/observe
-  behavior) before related findings can be marked verified.
-- If no smoke-check is feasible, **cap confidence at MEDIUM** and default
-  those findings to **Report-only**. Do not treat "build passed" alone as
-  sufficient verification.
-
-### 3. AUDIT
-
-Inspect for:
-
-- correctness problems
-- duplication
-- dead code
-- unnecessary files
-- unnecessary abstractions
-- excessive complexity
-- **unjustified complexity** (used and working, but more machinery than
-  demonstrated responsibility requires)
-- speculative functionality
-- inconsistent patterns
-- architecture/responsibility issues
-- dependency problems
-- error-handling problems
-- obvious security issues
-- test weaknesses
-- obvious performance problems
-- stale or noisy documentation
-- AI/vibe-code artifacts
-
-Use [cleanup-checklist.md](references/cleanup-checklist.md). For AI-heavy
-repos, also use [vibe-code-smells.md](references/vibe-code-smells.md).
-
-When meaningful complexity is encountered, do not stop after determining that
-the code is referenced. Perform **Necessity analysis** (below).
-
-### 4. CLASSIFY
-
-**Finding types:** Correctness, Security, Architecture, Maintainability,
-Duplication, Dead Code, Dependency, Performance, Testing, Documentation,
-**Unjustified Complexity**.
-
-**Unjustified Complexity** means code that is used and functional but introduces
-more machinery, flexibility, states, indirection, infrastructure, or capability
-than the demonstrated responsibility requires (for example speculative
-abstractions, single-use generics, wrappers that only forward, hypothetical
-provider/plugin systems, unused configuration, premature caching/scalability,
-redundant resilience, compatibility layers without a demonstrated need, or
-"nice-to-have" AI-generated capability).
-
-Distinguish:
-
-- **Dead code** — not used
-- **Unjustified complexity** — used, but more machinery than demonstrated
-  responsibility requires
-- **Speculative functionality** — working capability with no demonstrated
-  current or committed requirement
-
-Suspected unjustified complexity must **not** automatically become Actionable.
-Use the existing buckets:
-
-- **Actionable** — clearly unnecessary; required behavior understood;
-  simplification small; capability loss understood; verification possible
-- **Report-only** — strong evidence of unnecessary complexity, but ownership,
-  external consumers, runtime usage, future commitment, or behavioral impact
-  is uncertain
-- **Non-actionable** — justified by a demonstrated responsibility or
-  established boundary, or the concern is merely architectural/style preference
-
-When uncertain, prefer Report-Only.
-
-Every finding must include a **confidence** level independently from priority.
-
-#### Confidence
-
-Confidence describes certainty that the finding is real.
-Priority describes impact if the finding is real.
-Never use priority as a substitute for confidence.
-Do not raise priority because a hypothetical consequence could be severe.
-
-**HIGH CONFIDENCE**
-
-Directly demonstrated through one or more of:
-
-- execution
-- failing/passing tests
-- compiler/build output
-- lint/static-analysis output
-- optional mechanical dead-code / unused-dep tools (see tooling-hints.md)
-- reproducible runtime behavior
-- clear code/configuration contradiction
-
-**MEDIUM CONFIDENCE**
-
-Strong static evidence exists, but runtime impact or intent has not been
-directly demonstrated.
-
-**LOW CONFIDENCE**
-
-A potential issue exists, but important context, ownership, intent, runtime
-behavior, or external usage is unknown.
-
-Low-confidence findings should normally be report-only until verified.
-
-#### Priority
-
-Assign the lowest priority that is supported by evidence.
-Do not increase priority based only on hypothetical consequences.
-When runtime impact is unverified, explicitly state that uncertainty.
-Documentation drift should normally be Low unless it directly causes
-incorrect operation.
-A code smell is not automatically a defect.
-
-**CRITICAL**
-
-Use only for confirmed issues such as:
-
-- exploitable severe security vulnerability
-- realistic data loss/corruption
-- system cannot safely operate
-
-**HIGH**
-
-Use for:
-
-- confirmed incorrect runtime behavior affecting an important supported path
-- confirmed security weakness
-- confirmed build/deployment failure
-- important required behavior demonstrably broken
-
-**MEDIUM**
-
-Use for:
-
-- maintainability problems with concrete engineering cost
-- unjustified complexity with evidenced unnecessary machinery and understood
-  capability loss
-- test/reliability weaknesses
-- architectural or consistency problems with evidence they increase defect or
-  maintenance risk
-- incomplete implementation where impact is meaningful but not critical
-
-**LOW**
-
-Use for:
-
-- localized maintainability improvements
-- stale documentation
-- minor cleanup
-- small inconsistencies with limited operational impact
-
-## Necessity analysis
-
-When meaningful complexity is encountered, ask:
-
-1. What current responsibility does this code serve?
-2. What current requirement, contract, invariant, integration, operational
-   need, or established repository convention requires that responsibility?
-3. Is the amount of complexity proportional to that responsibility?
-4. Could the same required behavior be implemented materially more simply
-   using existing repository patterns?
-5. What concrete capability would be lost if this code were removed,
-   consolidated, specialized, or simplified?
-6. Is that lost capability currently required?
-7. Is it part of an explicitly committed near-term requirement?
-8. Is the complexity protecting an external/public contract?
-9. Is it an intentional architecture boundary?
-10. Is it required for testing, security, infrastructure isolation,
-    dependency inversion, plugin loading, or runtime configuration?
-11. Does repository history/documentation provide evidence for why it exists?
-12. Is another framework/library/platform layer already providing the same
-    capability?
-
-### Capability justification
-
-For suspected unjustified complexity, explicitly identify:
+## CLEAN workflow
 
 ```text
-Current required capability:
-Additional capability introduced by the complexity:
-Evidence that the additional capability is required:
-Simpler alternative:
-Capability lost by simplification:
-Evidence that the lost capability is acceptable:
-Uncertainty:
+UNDERSTAND REPOSITORY
+        ↓
+BASELINE
+        ↓
+FIND NEXT WORTHWHILE CLEANUP
+        ↓
+UNDERSTAND WHY THE CODE EXISTS
+        ↓
+CAN IT BE SAFELY IMPROVED?
+        │
+    ┌───┴────┐
+   NO       YES
+    │        │
+leave /      ↓
+investigate  PROPOSE SMALLEST FIX
+             ↓
+        HUMAN APPROVAL
+             ↓
+          FIX CODE
+             ↓
+           VERIFY
+             ↓
+       HUMAN ACCEPTS
+             ↓
+      FIND NEXT CLEANUP
 ```
 
-Do not allow findings such as "This factory looks unnecessary." Require the
-capability justification fields above.
+Do not build F1–F30 before the first fix. One useful cleanup → deal with it →
+continue. Park other discoveries in a small **internal queue**.
 
-### Weak justifications
+### Cleanup search order
 
-These statements alone are NOT sufficient justification for keeping complexity:
+1. REMOVE WASTE
+2. SIMPLIFY
+3. IMPROVE CODE QUALITY
+4. REMOVE UNNECESSARY WORK / PERFORMANCE
+5. FIX SECURITY PROBLEMS
+6. VERIFY
 
-- "might be useful later" / "future-proof" / "just in case" / "nice to have"
-- "more flexible" / "more scalable" / "more robust"
-- "clean architecture" / "follows SOLID" / "follows DRY" / "best practice"
-- "supports future providers" / "allows future extension"
+### 1. Understand repository
 
-Require repository-specific evidence. These phrases are also NOT proof that
-the code should be removed. Investigate first.
+- Read README / AGENTS.md / CONTRIBUTING / rules
+- Structure, entry points, conventions, dependencies
+- Build / test / lint / typecheck commands
+- Prefer [tooling-hints.md](references/tooling-hints.md) when present
+- Scope to a user-specified module when asked; large repos → one module at a time
+- Do not infer architecture from a single file
 
-### Justification hierarchy
+### 2. Baseline
 
-Prefer evidence in roughly this order:
+- Run available build/tests/lint/typecheck
+- Record pre-existing failures
+- Never weaken checks to get green
 
-1. Current executable behavior / runtime usage
-2. Public or external contracts
-3. Current product/business requirements
-4. Security or correctness invariants
-5. Deployment/infrastructure requirements
-6. Tests demonstrating required behavior
-7. Runtime configuration
-8. Established repository architecture/boundaries
-9. Repository documentation
-10. Explicitly committed near-term requirements
+No automated coverage for the area? Require a short **manual smoke-check**
+before claiming verified. If no smoke-check is feasible, leave alone / keep
+confidence capped — do not treat "build passed" alone as enough.
 
-Weak evidence: TODO without context, speculative comments, generic best
-practices, architectural preference, hypothetical future use.
+### 3. Find next worthwhile cleanup
 
-### Preserve intentional boundaries
+Actively look for waste and unjustified machinery (see checklist + vibe smells).
 
-Do NOT automatically remove an abstraction merely because it has one
-implementation, few callers, a simple implementation, or because direct calls
-would use fewer lines.
+**Remove waste examples:** dead code, unused files/exports/deps/config,
+abandoned dual implementations, AI leftovers, commented-out code, speculative
+features, unnecessary fallbacks/compatibility/flags/helpers/wrappers/
+interfaces/factories/providers, unused branches, committed build artifacts.
 
-A single implementation may still be a justified boundary for external/public
-contracts, established DI, testing seams, security boundaries, infrastructure
-isolation, plugins, dynamic loading, framework conventions, separate
-ownership, or committed near-term requirements.
+Unused ≠ automatically safe to delete. Check DI, reflection, dynamic loading,
+plugins, config, serialization, CLI, public contracts, tests, runtime.
 
-Require evidence before simplification.
-
-### Prefer simplification, not replacement architecture
-
-When an Unjustified Complexity finding is approved, prefer in order:
-
-remove → consolidate → specialize → simplify → reuse existing repository pattern
-
-Avoid replacing an old abstraction with a new "better" abstraction.
-Cleanup must produce less conceptual machinery, not merely different machinery.
-
-### Complexity delta check
-
-For every approved Unjustified Complexity cleanup, compare before/after:
-
-- files involved
-- abstractions involved
-- dependencies involved
-- configuration/options involved
-- meaningful branches/states involved
-
-Do not require every numeric measure to decrease. Ask: did conceptual
-complexity decrease while required capability remained? If the cleanup
-introduces equal or greater conceptual complexity, **STOP** and reassess.
-
-### Do not over-correct
-
-Objective: minimum **justified** complexity for demonstrated responsibilities—
-not minimum lines of code.
-
-Do not:
-
-- delete code merely because its requirement is not immediately obvious
-- remove extension points merely because only one implementation exists
-- simplify public contracts without explicit approval
-- remove operational resilience without understanding failure requirements
-- remove security checks because they appear redundant
-- remove scalability mechanisms without understanding actual deployment
-- replace working architecture with a preferred architecture
-- treat line count as the measure of simplicity
-
-### 5. DECIDE
-
-Before changing code, answer:
-
-- Is there concrete evidence this is a problem?
-- Is intended behavior sufficiently understood?
-- Can observable behavior be preserved?
-- Is this within cleanup scope?
-- Can the change be small and coherent?
-- Can the result be verified?
-
-Place each item into exactly one bucket:
-
-- **Actionable** — sufficient evidence and understanding to justify cleanup
-- **Report-only** — real or potential problem that must not be changed yet
-  (unclear intent/ownership, possible external consumers or public contracts,
-  uncertain runtime impact, product/architecture decision required, or
-  insufficient verification). Low-confidence findings normally land here.
-  Suspected unjustified complexity with uncertain requirement ownership also
-  lands here.
-- **Non-actionable observation** — stylistic preference, intentional pattern,
-  documented placeholder, alternative valid design, speculative improvement,
-  smell without demonstrated engineering impact, or complexity justified by a
-  demonstrated responsibility/boundary
-
-If uncertain, **REPORT** the finding (report-only) instead of modifying the code.
-Non-actionable observations must not become cleanup tasks unless new evidence
-changes their classification.
-
-For Unjustified Complexity, also confirm capability loss is understood and
-verification can show required behavior remains.
-
-### 6. PLAN
-
-The cleanup plan must contain **only actionable findings**.
-Report-only findings must not become automatic cleanup tasks.
-Non-actionable observations must never appear in the cleanup plan.
-
-Before editing, create a minimal cleanup plan. Prefer a concise table:
-
-| ID | Problem | Files | Action | Benefit | Risk | Verification |
-
-Reference finding IDs; do not restate the full analysis in the plan.
-
-Keep the plan minimal. Prefer few high-confidence changes over many speculative ones.
-
-### 7. CLEAN (Apply mode only)
-
-Follow **Human-in-the-loop (Apply)**.
-
-**Git mechanics before CLEAN begins:** create (or confirm) a dedicated working
-branch for the cleanup session. Do not apply cleanup commits on a shared base
-branch without explicit human instruction.
-
-Apply source changes only after individual human **APPROVE** for that finding
-ID. Apply at most one finding per approval cycle. Do not batch findings unless
-the human explicitly asks to batch those specific finding IDs.
-
-### 8. VERIFY (Apply mode only)
-
-After each approved finding is applied, run that finding's verification plan,
-inspect the git diff, confirm the change surface, present the post-change
-report, and stop for human **ACCEPT** / **REVISE** / **REVERT** / **STOP**.
-
-Also run broader build/tests/lint/typecheck/static analysis when they are
-part of the finding's verification plan or needed to confirm no regression.
-
-If the changed area has **no automated coverage**, require the manual
-smoke-check from Baseline's verification fallback before treating the finding
-as verified. If no smoke-check is feasible, do not mark verified; keep or
-reclassify as Report-only and cap confidence at MEDIUM.
-
-Inspect the diff for:
-
-- no accidental files
-- no unrelated modifications
-- no unintended behavior changes
-- no suppressed tests/checks
-- no unnecessary dependencies
-
-If the diff expands unexpectedly, stop and reassess (do not continue).
-See [vibe-code-smells.md](references/vibe-code-smells.md) item 14.
-### 9. REPORT
-
-#### Analyze mode
-
-Use this structure. Avoid repeating the same evidence in multiple sections.
-The Executive Summary should summarize rather than duplicate findings.
-The Cleanup Plan should reference finding IDs rather than restating the full
-analysis. Keep detailed evidence with the original finding.
-Prefer concise evidence-backed findings over long lists of speculative smells.
-
-**Title:** `# Code Cleanup Analysis`
-
-**Executive Summary** — Briefly state repository health, highest-impact
-findings, whether cleanup is justified, and important verification limitations.
-
-**Baseline** — Show only checks actually executed. Never imply that an
-unexecuted check passed.
-
-Example baseline lines:
-
-    Build                 PASS
-    Backend tests         PASS
-    Mobile tests          FAIL — 2 pre-existing failures
-    Lint                  PASS with warnings
-    Full pipeline          NOT RUN — tool unavailable
-
-**Actionable Findings** — Problems with sufficient evidence and understanding
-to justify a cleanup action. Each finding must contain: ID, Title, Type,
-Priority, Confidence, Evidence, Impact, Decision, Proposed action,
-Verification.
-
-Example:
-
-    F1 — Port configuration drift
-    Type: Correctness
-    Priority: Medium
-    Confidence: High
-    Evidence: ...
-    Impact: ...
-    Decision: Cleanup candidate
-    Proposed action: ...
-    Verification: ...
-
-**Report-Only Findings** — Potential or real problems that should NOT
-currently be automatically changed because intent/ownership is unclear,
-external consumers or public contracts may be affected, runtime impact is
-uncertain, architecture/product decisions are required, or verification is
-insufficient. Each must state **Reason report-only**.
-
-Example:
-
-    R1 — Incomplete request-id propagation
-    Type: Maintainability
-    Priority: Medium
-    Confidence: Medium
-    Evidence: ...
-    Reason report-only:
-    Notification service does not consume the header, but intended observability
-    requirements are not established.
-
-**Non-Actionable Observations** — Stylistic preferences, intentional patterns,
-documented placeholders, alternative valid designs, speculative improvements,
-or smells without demonstrated engineering impact. These must NOT appear in
-the cleanup plan.
-
-Example:
-
-    O1 — Duplicate DTO definitions
-    Reason:
-    Duplication exists, but no behavioral drift or maintenance problem was
-    demonstrated. Consolidation would currently be architectural preference.
-
-**Cleanup Plan** — Include ONLY actionable findings (finding IDs). Prefer:
-
-    | ID | Problem | Files | Action | Benefit | Risk | Verification |
-
-**Risks / Unverified Areas** — State commands not executed, runtime behavior
-not verified, external consumers not verified, and ownership/product
-decisions required.
-
-**Modification Summary**
-
-    Files Changed: None
-    Files Created: None
-    Files Deleted: None
-    Dependencies Changed: None
-    Behavior Changes: None
-
-For Analyze mode, Modification Summary values should normally remain None.
-
-#### Review mode
-
-Same Actionable / Report-only / Non-actionable structure as Analyze, but:
-
-- State the resolved diff scope (`<parent>...HEAD`, worktree, or user override)
-- State the stated goal of the change (from user or PR/commit message)
-- Classify touched hunks: Intended / Unrelated but harmless / Scope creep /
-  Speculative addition
-- Cleanup Plan may include per-hunk revert candidates (HITL only; no auto-revert)
-- Modification Summary remains None until a human-approved remediation runs
-
-Title: `# Code Cleanup Review`
-
-#### Apply mode
-
-When all findings have been reviewed or the human stops the session, report:
-
-```markdown
-## Resolved findings
-
-## Skipped findings
-
-## Deferred findings
-
-## Remaining report-only findings
-
-## New findings discovered during cleanup
-
-## Files changed
-
-## Files created
-
-## Files deleted
-
-## Dependencies changed
-
-## Verification performed
-
-## Verification not performed
-
-## Behavior changes
-
-## Remaining risks
-```
-
-Also maintain and include session progress totals (see Human-in-the-loop).
-Do not treat skipped, deferred, or remaining report-only items as resolved.
-Keep the final report concise and in simple English. Structured technical
-detail is fine; do not repeat the same evidence in multiple sections.
-
----
-
-## Human-in-the-loop (Apply)
-
-Mandatory for all source modifications (including Review remediations and
-per-hunk reverts). Sequence:
-
-ANALYZE or REVIEW → classify findings → human review → fix **ONE** finding →
-verify → human review → continue to next finding
-
-Cleanup logic, safety rules, priority, confidence, necessity analysis, and
-approval requirements are unchanged. This section also defines how to talk to
-the human in APPLY chat.
-
-### Git mechanics (Apply)
-
-- **Before CLEAN:** create or confirm a dedicated working branch for this
-  cleanup session.
-- **On ACCEPT:** create exactly **one commit** for that finding. Include the
-  finding ID in the commit message (example:
-  `F3: remove unused ExpoPushAdapter fallback`).
-- **On REVERT:** use `git revert <that finding's commit sha>` — not a manual
-  undo of files. Do not revert unrelated commits or pre-existing user changes.
-- Record the commit SHA with the finding in session progress / final report.
-
-### Human-in-the-loop rule
-
-No finding may be modified automatically.
-
-Every finding must receive individual human approval before source changes
-are made.
-
-Approval for one finding does not authorize changes for another finding.
-
-Do not batch multiple findings under one approval unless the human
-explicitly asks to batch those specific finding IDs.
-
-### Conversational UX (APPLY chat)
-
-Deep analysis internally. Small decisions externally.
-
-The human should never need to read a full audit report just to answer the
-next cleanup question.
-
-#### Simple English
-
-All human-facing APPLY chat must use simple English:
-
-- short sentences
-- common words
-- concrete explanations
-- small paragraphs
-- at most 3 short bullets when useful
-
-Avoid formal audit language when a simpler phrase exists.
-Avoid tables in interactive chat.
-
-Chat labels (prefer in interactive chat):
-
-- Unjustified Complexity → Extra complexity
-- Actionable → Safe to fix
-- Report-Only → Needs more information
-- Non-Actionable → Leave it alone
-- Current required capability → What the app needs today
-- Additional capability introduced → What this extra code adds
-- Proposed remediation → Suggested change
-
-Show formal classification only when useful or the user asks.
-
-#### Chunked chat
-
-Never present the entire investigation or finding report at once.
-
-Reveal information in small chunks:
-
-FIND → explain ONE important point → ask ONE question → STOP →
-human answers → explain the next relevant point → ask ONE question → STOP
-
-Continue until enough information exists for the current decision.
-
-#### Response size
-
-For normal interactive messages:
-
-- prefer 2-4 short sentences
-- use at most 3 short bullets when useful
-- then show the decision
-- avoid tables
-- avoid long technical summaries
-- avoid repeating session progress after every interaction
-
-Aim for roughly **5-8 short lines** before decision options.
-
-Detailed information stays available on request:
-
-- Show details
-- Show evidence
-- Show code
-- Show affected files
-- Show technical reasoning
-
-#### Do not show internal report fields by default
-
-Do not automatically show:
-
-- Type, Priority, Confidence
-- Capability justification
-- Classification tables
-- Full evidence or full uncertainty analysis
-- Session progress
-- Cleanup plan
-- Detailed verification plan
-
-Keep these internally. Show them only when necessary for the immediate
-decision, or when the human asks.
-
-#### One question / one decision at a time
-
-When human information is needed:
-
-1. Ask **exactly one** question **or** present **exactly one** decision.
-2. STOP.
-3. Wait for the answer before continuing.
-
-Do not ask multiple requirement questions in one message.
-
-Do not mix decisions from different stages in one prompt
-(for example do not combine investigate / approve / skip / defer / evidence /
-next finding when those belong to different stages).
-
-Ask only what is relevant **now**.
-
-#### Do not ask what the repository can answer
-
-Before asking the human, investigate the repository (code, tests, config, docs,
-history, patterns).
-
-Ask the human only when the answer cannot be established with enough
-confidence from the repository.
-
-#### Progressive disclosure
-
-Use this interaction pattern:
-
-FIND → EXPLAIN ONE POINT → ASK ONE QUESTION IF NEEDED → WAIT →
-(next point / INVESTIGATE conversationally) → SUGGEST SIMPLE CHANGE →
-ASK FOR APPROVAL → WAIT → APPLY → VERIFY → SHOW SIMPLE RESULT →
-WAIT FOR ACCEPTANCE
-
-#### Investigation can end early
-
-Do not continue investigating once enough information exists for the current
-decision.
-
-Example:
+**Feature flow before file cleanup:** when complexity spans a feature,
+reconstruct:
 
 ```text
-I cannot prove whether another provider is required.
-
-Without that information, I don't recommend changing this code.
-
-Leave it for now?
-
-1. Yes
-2. Investigate further
-3. Show details
+Request → Controller → Service → Factory → Interface → Provider → External API
 ```
 
-Then STOP.
+Ask whether every layer owns a real responsibility. Do not judge files in
+isolation when the waste is the chain.
 
-#### Handle "Not sure"
+**Vibe-code expansion:** simple requirement → oversized implementation.
 
-"Not sure" is a valid answer.
+```text
+REQUIREMENT → ACTUAL FEATURE FLOW → IMPLEMENTATION MACHINERY
+```
 
-If the user is not sure:
+Which parts are necessary for the required behavior? Referenced layers are not
+automatically justified.
 
-- investigate further when possible
-- do not pressure the user to approve
-- do not assume the feature is unnecessary
-- keep it as Needs more information (Report-Only) when uncertainty remains
+**Simplify bulky code:** large methods/classes, deep nesting, repeated
+mapping/validation/errors, forwarding wrappers, abstraction chains, one-use
+generics, excessive defense, unused state machines. Prefer simpler existing
+code — not a replacement architecture.
 
-### Simple finding presentation
+**Quality:** duplication, unclear responsibility, weak errors, misleading
+names, pattern inconsistency, weak tests, AI chat residue, terminology drift.
+No style-only rewrites, mass renames, or forced SOLID/DRY/Clean Architecture.
 
-Default format — one point, then one decision:
+**Performance — remove work first:** Can we stop doing this work entirely?
+Then optimize only if needed. Look for repeated queries/API/JSON/mapping,
+N+1, over-fetch, duplicate validation, work before early exit, unnecessary
+polling, unbounded caches, etc. Evidence required. Do not add caching/queues/
+concurrency/batching without justification.
+
+**Security — trust boundaries:** External input → API → validation →
+authn/authz → business logic → DB/FS/external. Evidence required. Prefer the
+**smallest secure fix**. Do not invent vulns or build a security architecture
+for a local hole.
+
+### 4. Understand why it exists (lightweight)
+
+For referenced code that might be unnecessary, ask briefly:
+
+1. What does it do?
+2. Why does the app need it?
+3. What breaks if removed/simplified?
+4. Is that capability required today?
+5. Can existing repo code do it more simply?
+
+Do **not** force a long questionnaire every time. Go deeper only when unsure.
+
+If still unclear after repo investigation: ask the human **one** simple
+requirement question. If still unclear: leave alone and move on.
+
+Weak justifications alone ("future-proof", "SOLID", "nice to have") are not
+enough to keep complexity — nor enough to delete. Investigate.
+
+Preserve intentional boundaries (public contracts, established DI, real test
+seams, security, plugins, framework conventions). One implementation ≠ delete.
+
+Detailed necessity / capability justification for Analyze: see
+[cleanup-checklist.md](references/cleanup-checklist.md).
+
+### 5. Fixability Gate
+
+Before presenting to the human:
+
+1. Do I understand the problem?
+2. Do I understand required behavior?
+3. Do I know a smaller/safer implementation?
+4. Can I keep the change reasonably contained?
+5. Can I verify the result?
+
+- **YES** → propose the fix
+- **NO** → investigate (repo first)
+- Still unclear → one human question, then leave alone if needed
+
+Do not produce a long report because a possible issue exists.
+
+### 6. Propose + human approval (mandatory)
+
+One cleanup at a time. **No automatic source modification.**
+
+Every HITL message: simple English, a short summary, then **one target
+question**. The options must answer that question only.
+
+Pattern:
 
 ```text
 F<n> — <simple title>
 
-<2-4 short sentences on ONE important point.>
+What I found:
+- <one short point>
+- <one short point>
 
-<one question or one decision>
+What I want to do:
+- <one short point>
+
+<one target question>
 
 1. ...
 2. ...
@@ -874,10 +265,187 @@ Example:
 ```text
 F4 — Extra provider setup
 
-The app sends push notifications through Expo.
+What I found:
+- The app sends push through Expo only
+- Extra factory/interface exists for switching providers
 
-I also found an interface and factory for switching providers, but I could
-not find another provider in use.
+What I want to do:
+- Remove the unused switch setup and keep Expo
+
+Apply this cleanup?
+
+1. Yes
+2. Show why
+3. Change approach
+4. Skip
+5. Stop
+```
+
+Then **STOP**.
+
+Do not dump priority/confidence tables, full evidence, capability essays, or
+large plans unless needed or requested.
+
+Decisions: Yes → APPROVE; Show why → details then re-ask; Change approach →
+MODIFY APPROACH; Skip → SKIP; Stop → STOP. Also support Investigate / Defer
+when relevant.
+
+### 7. Fix (after APPROVE only)
+
+Apply **only** that cleanup.
+
+Do not fix another issue in the same file, refactor unrelated code, rename
+unrelated symbols, update unrelated docs, add "while we're here" work, or add
+unrelated dependencies. Newly discovered issues → internal queue, leave unchanged.
+
+#### Change budget
+
+Before editing, record expected surface (internal):
+
+```text
+Expected: files changed / created / deleted / deps changed
+```
+
+After: compare Actual vs Expected. If surface expands unexpectedly → **STOP**.
+Do not accept extra changes automatically.
+
+#### Net complexity guard
+
+Compare conceptual complexity (files, abstractions, layers, deps, config,
+states, branches, indirection).
+
+Cleanup should normally **reduce or preserve** conceptual complexity.
+If Service→Helper becomes Service→Interface→Factory→Strategy→Helper → **STOP**.
+Increasing complexity only with a concrete correctness/security/performance/
+contract/infrastructure reason — explicitly justified.
+
+#### Workspace safety
+
+Before each cleanup, capture: tracked mods, staged mods, untracked files,
+deleted files. Pre-existing changes belong to the user — never
+modify/delete/revert them automatically.
+
+After edits and after mutating commands, re-check workspace. Unexpected
+changes → **STOP**.
+
+Never routinely use `git clean -fd` or `git reset --hard`.
+
+#### Creation / dependency guards
+
+Before any **new** source file: search owner, similar code, consolidate first;
+create only for a clear responsibility that cannot live elsewhere.
+
+Before any **new** dependency: check existing deps, platform/stdlib, repo
+utils; add only when benefit clearly beats cost. Cleanup normally removes deps.
+
+### 8. Verify
+
+#### Verification safety
+
+- Correct working directory
+- Prefer repository-defined commands
+- Know whether the command writes files
+- Avoid accidental build output in source trees
+- Re-check workspace after mutating commands
+
+Failed command ≠ automatically "code is broken." Distinguish: code failure,
+pre-existing failure, environment, missing tool, wrong command, wrong cwd,
+generated-artifact issue.
+
+#### After one cleanup
+
+- Build / relevant tests / lint / typecheck as appropriate
+- Security/performance checks when that was the fix
+- Inspect git diff
+- Check change budget + unexpected files
+- Confirm required behavior remains
+- Net complexity OK
+
+Short result — same pattern: summary points, then one target question:
+
+```text
+F<n> cleaned.
+
+Changed:
+- ...
+
+Removed:
+- ...
+
+Checked:
+- build / tests / no unexpected files
+
+Behavior:
+No expected behavior change.
+
+Keep this cleanup?
+
+1. Accept
+2. Revise
+3. Revert
+4. Show diff
+5. Stop
+```
+
+Then **STOP**.
+
+### 9. Accept / Revise / Revert
+
+- **Accept** → mark resolved; find next (or end). Commits optional (below).
+- **Revise** → keep active; re-approve if scope expands.
+- **Revert** → undo only that cleanup (see Git). Verify revert.
+
+### Commits are optional
+
+Important loop: one cleanup → one approval → isolated change → verify → accept.
+
+Do **not** require one git commit per finding. This is not a Git workflow
+manager. Commit after Accept only if the user asks (or session convention).
+If a commit exists, Revert = `git revert <sha>`; else undo only that cleanup's
+files. Never touch unrelated user changes.
+
+### End condition
+
+Stop when remaining issues are preference-only, complexity is justified,
+product/architecture decisions are required, perf/security ideas aren't
+evidenced, further change would add complexity or only marginal benefit, or
+safe verification isn't possible.
+
+Say:
+
+> Cleanup complete. I do not see another change that is clearly worth making
+> safely.
+
+### CLEAN session end report (concise)
+
+Resolved / Skipped / Deferred / Left alone / Files changed-created-deleted /
+Deps / Verification / Behavior / Why stopped.
+
+No need to repeat evidence across sections.
+
+---
+
+## Human chat rules (CLEAN)
+
+Point every HITL message at **one target question**.
+
+- Simple English
+- Short summary first (2–4 bullets: what I found / what I want to do / what I checked)
+- Then ask **one** question those bullets lead to
+- Options answer that question only; then STOP
+- Do not bury the question under analysis
+- Investigate the repo before asking the human
+- Progressive disclosure: Show why / Show evidence / Show files on request
+- "Not sure" → investigate further or leave alone; do not pressure approval
+- Chat labels: Safe to fix / Needs more info / Leave it alone / Extra complexity
+- Formal classification is for Analyze / internal / Show why — not default chat
+
+If you need a requirement answer:
+
+```text
+What I found:
+- Extra provider switch code exists
+- Only Expo is used
 
 Is another push provider planned?
 
@@ -887,389 +455,91 @@ Is another push provider planned?
 4. Show evidence
 ```
 
-Then STOP.
+Then STOP. Do not ask several requirement questions in one message.
 
-### Before applying a finding
+---
 
-Internally prepare (and keep for the final report / on request):
+## REVIEW mode (explicit)
 
-- Finding ID and title
-- Type, Priority, Confidence
-- Evidence, Impact
-- Why it should be changed
-- Exact proposed remediation
-- Expected files to change / create / delete
-- Expected dependency and behavior changes
-- Risk
-- Verification plan
-- For Unjustified Complexity: capability justification fields
+Diff scope:
 
-In chat, do **not** dump that list by default.
+1. Default `git diff <parent>...HEAD` (three-dot / merge-base)
+2. Else worktree `git status` / `git diff`
+3. User may override the ref
 
-Once enough information is known, use a simple approval prompt:
+Hunk labels (map to existing types; don't invent a parallel system):
 
-```text
-F<n> — Suggested cleanup
+- **Intended** — matches stated goal
+- **Unrelated but harmless** — outside scope, low risk
+- **Scope creep** — outside scope, real change surface
+- **Speculative addition** — new capability without demonstrated need
 
-<2-4 short sentences: what you propose and that behavior should stay the same.>
+Only touched paths are in remediation scope. Cross-ref
+[vibe-code-smells.md](references/vibe-code-smells.md) item 14.
 
-What do you want to do?
+Per-hunk revert only after HITL. No auto-revert.
 
-1. Apply this change
-2. Change the approach
-3. Skip it
-4. Show details
-```
+---
 
-Then STOP.
+## ANALYZE mode (explicit)
 
-Map choices to existing decisions:
+Discover → Baseline → Audit → Classify → Decide → Plan → Report.
+No source edits. Full findings / confidence / priority / plan allowed here.
+Use [cleanup-checklist.md](references/cleanup-checklist.md) for classification
+detail. Still prefer evidence; a smell is not automatically a defect.
 
-| Chat choice | Internal decision |
-|-------------|-------------------|
-| Apply this change | APPROVE |
-| Change the approach | MODIFY APPROACH |
-| Skip it | SKIP |
-| Show details | reveal formal fields; then re-ask |
-| (also support) Defer / Stop / Investigate | DEFER / STOP / INVESTIGATE |
+---
 
-Do not modify anything until the user chooses **Apply this change** (APPROVE).
+## Optional Jev decision gates
 
-Do not automatically simplify or delete working-but-unnecessary code.
-**APPROVE** is still required before modification.
+Jev may be used as an **optional** bounded safety layer. **Not** the cleaning
+engine. The coding agent still understands code, proposes fixes, edits, and
+verifies.
 
-### APPROVE
+Jev may evaluate **structured evidence already gathered**, e.g.:
 
-Apply ONLY the approved finding.
+- Did actual change exceed approved budget?
+- Unexpected files appear?
+- Diff outside approved scope?
+- Conceptual complexity increased?
+- Human review required?
+- STOP because a safety condition failed?
 
-Do not perform opportunistic cleanup.
+Example outputs: `ALLOW` | `STOP` | `HUMAN_REVIEW`
 
-Do not modify unrelated code.
+Do **not** ask Jev to redesign architecture, refactor large services, decide
+from raw source whether an abstraction is necessary, or generate the fix.
 
-Do not fix another finding while touching the same file.
-
-If another cleanup opportunity is discovered, record it as a new finding
-and leave it unchanged.
-
-For Unjustified Complexity: follow remove → consolidate → specialize →
-simplify → reuse existing pattern. After applying, run the **complexity
-delta check**. If conceptual complexity did not decrease, STOP and reassess.
-
-### MODIFY APPROACH
-
-Do not change source.
-
-Update the proposed remediation according to human feedback and present it
-again for approval (simple chat form).
-
-### INVESTIGATE
-
-Do not change source.
-
-Gather additional evidence needed to resolve uncertainty.
-
-INVESTIGATE must also be conversational. Do **not** investigate everything and
-then dump the complete result.
-
-After investigation work:
-
-1. Identify the **most important conclusion** first.
-2. Explain that one point in 2-4 short sentences.
-3. Ask **one** follow-up decision.
-4. STOP.
-5. Continue chunk by chunk until enough information exists for a decision—
-   or until investigation can end early.
-
-Example first message after investigation:
-
-```text
-NS-R2 — Push adapter setup
-
-I checked how it is used.
-
-Email looks fine, so I would leave it alone.
-
-Push is different: both the generic PushAdapter and ExpoPushAdapter
-are used directly.
-
-Want to know why?
-
-1. Yes
-2. Skip this finding
-3. Show technical details
-```
-
-Then STOP.
-
-If the human chooses Yes, explain the next point only:
-
-```text
-The generic adapter handles sending.
-
-But Expo is still used directly for circuit checks and receipt polling.
-
-So the abstraction does not fully hide Expo.
-
-Want me to check whether this can safely be simplified?
-
-1. Yes
-2. Leave it for now
-3. Show code evidence
-```
-
-Then STOP.
-
-Internally, after investigation:
-
-- update confidence if justified
-- update priority if justified
-- reclassify Report-Only → Actionable only when evidence supports it
-- keep the classification change explanation for the final report / Show details
-
-Do not dump those updates in chat unless the human asks or they are required
-for the immediate decision.
-
-Modification still requires separate **APPROVE**.
-
-### SKIP
-
-Do not modify the finding.
-Record it as skipped by human decision.
-
-### DEFER
-
-Do not modify the finding.
-Keep it in the final report as deferred.
-
-### STOP
-
-Stop cleanup immediately.
-Do not continue to another finding.
-
-### Post-change human review
-
-After applying ONE finding:
-
-1. Run the verification defined for that finding.
-2. Inspect the git diff.
-3. Confirm the actual change surface.
-4. Keep the formal result for the final cleanup report.
-
-In chat, show a **simple** result by default (not the full formal template):
-
-```text
-F<n> fixed.
-
-Changed:
-- <files changed or deleted>
-
-Checked:
-- <short verification results>
-- No unexpected files were created (or list surprises)
-
-Behavior:
-<expected behavior change, or none>
-
-Keep this change?
-
-1. Accept
-2. Revise
-3. Revert
-4. Show diff/details
-5. Stop
-```
-
-Then STOP.
-
-Map: Accept → ACCEPT, Revise → REVISE, Revert → REVERT, Stop → STOP.
-Show diff/details reveals formal fields (files created/deleted, dependencies,
-verification executed/result, unexpected changes, remaining risk, complexity
-delta when relevant), then re-ask Keep this change?
-
-### ACCEPT
-
-Mark the finding resolved.
-
-Create exactly one git commit for this finding (finding ID in the message).
-Record the commit SHA.
-
-Only then present the next unresolved finding.
-
-### REVISE
-
-Keep the finding active.
-
-Explain the required adjustment simply and request approval before making
-additional modifications if the adjustment expands the previously
-approved change.
-
-### REVERT
-
-Revert ONLY changes introduced for that finding by running
-`git revert <that finding's commit sha>`.
-
-Do not manually undo files when a commit exists.
-Do not revert pre-existing user changes or unrelated working-tree changes.
-Do not revert other findings' commits.
-
-Verify the revert and report the result.
-
-For **Review** remediations that revert a hunk before a cleanup commit exists,
-use a targeted patch revert or `git checkout <parent> -- <path>` only after
-human APPROVE, scoped to the approved paths/hunks.
-### Important change-scope rule
-
-While fixing finding `F<n>`:
-
-Allowed change surface = only changes necessary to resolve that finding using the
-approved remediation.
-
-Never use "while we're here", "for consistency", "related cleanup", or
-"small improvement" as justification for expanding the change.
-
-Any newly discovered issue must become a separate finding.
-
-### Report-only findings
-
-Report-Only findings must also participate in the human loop.
-
-In chat, explain simply that this **Needs more information** before any change.
-Use the simple finding presentation. Ask at most one question if needed.
-
-Allow: **INVESTIGATE**, **DEFER**, **SKIP** (worded simply for the user).
-
-Do not offer **APPROVE** / Apply until sufficient evidence allows the finding
-to be reclassified as Actionable (Safe to fix).
-
-Reclassification itself does not authorize modification.
-
-### Non-actionable observations
-
-Do not automatically modify them.
-
-In chat, explain simply that you recommend **Leave it alone**, unless the user
-wants more investigation.
-
-Allow the human to: **ACKNOWLEDGE**, **INVESTIGATE**, **PROMOTE FOR ANALYSIS**,
-**SKIP** (worded simply).
-
-If promoted, analyze it as a new finding.
-Do not directly modify code.
-
-### Session progress
-
-Maintain cleanup progress **internally**:
-
-```text
-Resolved:
-Skipped:
-Deferred:
-Under investigation:
-Pending actionable:
-Pending report-only:
-```
-
-Never silently drop a finding.
-
-Do **not** print session progress after every finding interaction.
-
-Show progress only:
-
-- when the human asks
-- when switching major phases
-- when the human stops
-- in the final report
+The skill must work fully **without** Jev. No mandatory Jev dependency.
 
 ---
 
 ## Hard constraints
 
-The cleanup agent MUST NOT:
+MUST NOT:
 
-- introduce new features under the label of cleanup
+- introduce features under "cleanup"
 - intentionally change business behavior
 - change public contracts without explicit approval
-- redesign architecture simply because another design looks cleaner
-- introduce speculative abstractions
-- create unnecessary interfaces, factories, adapters, wrappers or layers
-- add dependencies for trivial functionality
-- perform unrelated framework upgrades
-- perform unrelated dependency upgrades
-- mass rename code for stylistic reasons
-- remove apparently unused code without checking indirect/dynamic usage
-- suppress tests, lint rules, compiler errors or security checks
-- rewrite working code solely because another implementation style is preferred
-
-## Creation guard
-
-Before creating ANY new source file:
-
-1. Search for an existing owner of the responsibility.
-2. Search for similar implementations.
-3. Determine whether existing code can be consolidated.
-4. Create the file only if it represents a clear responsibility that cannot
-   reasonably belong to an existing module.
-
-Treat unexpected growth in file count as a cleanup warning.
-
-## Dependency guard
-
-Before adding ANY dependency:
-
-1. Check existing dependencies.
-2. Check framework/platform capabilities.
-3. Search existing repository utilities.
-4. Add the dependency only when its benefit clearly justifies its maintenance
-   and security cost.
-
-Cleanup normally removes or consolidates dependencies; adding one is exceptional
-and must be justified in the report.
+- redesign architecture because another design looks nicer
+- introduce speculative abstractions / unnecessary layers
+- add deps for trivial functionality
+- unrelated framework/dependency upgrades
+- mass rename for style
+- remove apparently unused code without checking indirect/dynamic use
+- suppress tests, lint, compiler, or security checks
+- rewrite working code solely for preferred style
+- use "while we're here" / "for consistency" / "related cleanup" to expand scope
 
 ## Repository search guard
 
-When searching the repository:
-
-- Prefer source-controlled application paths first.
-- Exclude dependency, generated, cache, build-output, and VCS directories
-  unless they are specifically relevant to the investigation.
-
-Examples include:
-
-- `.git/`
-- `node_modules/`
-- `.next/`
-- `dist/`
-- `build/`
-- `bin/`
-- `obj/`
-- `coverage/`
-
-Do not treat matches from generated or dependency directories as evidence
-of application usage.
-
-If a search command fails, its output must not be used as evidence.
-Correct the command or use another verification method.
-
-For `git log --follow`, inspect one path at a time because Git does not
-support following multiple paths in a single invocation.
-
-Do not perform broad repository-wide searches when a narrower source or
-module-level search can answer the question.
+Prefer application source paths. Exclude `.git/`, `node_modules/`, `.next/`,
+`dist/`, `build/`, `bin/`, `obj/`, `coverage/` unless specifically relevant.
+Do not treat generated/dependency matches as app-usage evidence.
+Failed search output is not evidence. Prefer narrow searches.
+`git log --follow`: one path at a time.
 
 ## Principles are not mandates
 
-Do not make subjective style preferences mandatory.
-
-Do not blindly apply SOLID, DRY, design patterns, Clean Architecture, or other
-principles. They may be useful reasoning tools, but applying them must reduce a
-concrete problem in the current repository.
-
-## Stop conditions
-
-Stop and report (do not force changes) when:
-
-- intended behavior is unclear
-- cleanup would require public API or contract changes without approval
-- verification cannot be performed and risk is non-trivial
-- the only "improvement" is stylistic preference
-- no finding has enough evidence to justify modification
+Do not make subjective style mandatory. SOLID/DRY/patterns are reasoning aids
+only when they reduce a concrete problem in **this** repository.

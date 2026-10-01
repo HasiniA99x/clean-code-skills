@@ -1,10 +1,16 @@
 # Vibe-Code Smells
 
-Investigation guide for repositories created or heavily modified with AI /
-"vibe coding." Use with the `code-cleanup` skill after Discover and Baseline.
+Investigation guide for AI / "vibe coding" repositories. Use with
+`code-cleanup` **CLEAN** (next fix) or **ANALYZE** (report).
 
-A smell is a signal to investigate. It is **not** automatically a defect.
-When uncertain, report the finding; do not change the code.
+A smell is a signal to investigate — **not** automatically a defect.
+When uncertain, leave alone / report; do not change the code.
+
+For necessity, Fixability Gate, and approval rules: see `SKILL.md`.
+For checklists: see [cleanup-checklist.md](cleanup-checklist.md).
+
+**Feature flow:** when complexity spans a feature, reconstruct
+Requirement → flow → machinery before judging individual files.
 
 ---
 
@@ -382,7 +388,10 @@ When uncertain, report the finding; do not change the code.
 
 Full necessity rules live in **Necessity analysis** in `SKILL.md`. Use that
 section for capability justification, weak justifications, hierarchy,
-boundaries, and classification safety. Below: smell-specific **symptoms** only.
+boundaries, and classification safety. Also use the **Vibe-code expansion
+detector** in `SKILL.md` (Requirement → actual implementation).
+
+Below: smell-specific **symptoms** only.
 
 ### 16. Used-but-unnecessary code
 
