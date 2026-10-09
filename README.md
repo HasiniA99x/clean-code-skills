@@ -128,3 +128,7 @@ Evaluate this skill against a seeded NestJS app:
 - Human gold set, scoring rules, and a reference-run score: [`docs/vibe-cleanup-benchmark-eval.md`](docs/vibe-cleanup-benchmark-eval.md)
 
 Keep the gold set **outside** the benchmark checkout when the cleaner runs (blind evaluation).
+
+## User experience feedback
+
+Session notes from people who have run the skill: [`docs/user-experience-feedback.md`](docs/user-experience-feedback.md).
